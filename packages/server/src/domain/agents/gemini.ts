@@ -47,16 +47,39 @@ const toAiError = (description: string) =>
     reason: new AiError.UnknownError({ description })
   });
 
-const promptToText = (prompt: LanguageModel.ProviderOptions["prompt"]) =>
-  prompt.content
-    .flatMap((message) => {
-      if (typeof message.content === "string") {
-        return [message.content];
-      }
+interface GeminiTextContent {
+  readonly role: "user" | "model";
+  readonly parts: readonly [{ readonly text: string }];
+}
 
-      return message.content.flatMap((part) => part.type === "text" ? [part.text] : []);
-    })
+const messageText = (message: LanguageModel.ProviderOptions["prompt"]["content"][number]) => {
+  if (typeof message.content === "string") {
+    return message.content;
+  }
+
+  return message.content
+    .flatMap((part) => part.type === "text" ? [part.text] : [])
     .join("\n");
+};
+
+const promptSystemInstruction = (prompt: LanguageModel.ProviderOptions["prompt"]) => {
+  const text = prompt.content
+    .filter((message) => message.role === "system")
+    .map(messageText)
+    .join("\n");
+
+  return text.length === 0
+    ? undefined
+    : { parts: [{ text }] };
+};
+
+const promptContents = (prompt: LanguageModel.ProviderOptions["prompt"]): readonly GeminiTextContent[] =>
+  prompt.content
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: messageText(message) }]
+    }));
 
 const geminiUrl = (model: string, apiKey: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -143,12 +166,8 @@ const toolConfig = (options: LanguageModel.ProviderOptions) => {
 };
 
 const requestBody = (options: LanguageModel.ProviderOptions) => ({
-  contents: [
-    {
-      role: "user",
-      parts: [{ text: promptToText(options.prompt) }]
-    }
-  ],
+  systemInstruction: promptSystemInstruction(options.prompt),
+  contents: promptContents(options.prompt),
   tools: geminiTools(options.tools),
   toolConfig: toolConfig(options)
 });

@@ -8,6 +8,10 @@ dist/
 build/
 *.tgz
 
+# local persistent data
+.data/
+**/.data/
+
 # code coverage
 coverage/
 *.lcov

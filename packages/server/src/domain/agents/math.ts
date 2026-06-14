@@ -1,8 +1,9 @@
-import { Effect, Layer } from "effect";
+import { Console, Effect, Layer, Stream } from "effect";
 import { Model as AiModel } from "effect/unstable/ai";
-import * as AgentCli from "./agent-cli.ts";
-import { AgentHarness, AgentSkill } from "./agent-harness.ts";
+import * as AgentCli from "./harness/index.ts";
+import { AgentHarness, AgentSession, AgentSkill, SessionRepository } from "./harness/index.ts";
 import { GeminiModel } from "./gemini.ts";
+import { FileSessionRepository } from "../../infra/agents/file-session-repository.ts";
 
 const MathArgs = {
   a: AgentCli.Argument.number("a").pipe(
@@ -107,16 +108,53 @@ const MathHarness = AgentHarness.make({
 export const mathAgent2 = Effect.gen(function* () {
   const provider = yield* AiModel.ProviderName;
   const modelName = yield* AiModel.ModelName;
-  const task = "Calculate ((6 * 7) + (2 ^ 8)) / 10. Use the CLI step by step. Required CLI sequence: first `math multiply 6 7`, then `math power 2 8`, then add those two results, then divide that sum by 10.";
-  const result = yield* MathHarness.run(task, { maxSteps: 5 });
+  const repository = yield* SessionRepository;
+  const task = Bun.argv.slice(2).join(" ").trim() || "Calculate ((6 * 7) + (2 ^ 8)) / 10. Use the CLI step by step.";
+  const sessionId = Bun.env.AGENT_SESSION_ID ?? "math-demo";
+  const storedSession = yield* repository.getSession(sessionId).pipe(
+    Effect.catchTag("SessionNotFound", () => repository.makeSession({ id: sessionId }))
+  );
+
+  const session = AgentSession.make(MathHarness);
 
   console.log(`Provider: ${provider}`);
   console.log(`Model: ${modelName}`);
-  console.log(`${task} = ${result}`);
+  console.log(`Session: ${sessionId}`);
+  console.log("Conversation messages:");
 
-  return result;
+  const messages = yield* session.stream({
+    input: task,
+    messages: storedSession.messages,
+    maxSteps: 5
+  }).pipe(
+    Stream.tap((message) => Effect.gen(function* () {
+      yield* repository.appendMessages({
+        sessionId,
+        messages: [message]
+      });
+      yield* Console.log(JSON.stringify(message, null, 2));
+    })),
+    Stream.runCollect
+  );
+
+  let output = "";
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message?.role === "assistant") {
+      output = message.content;
+      break;
+    }
+  }
+
+  console.log(`${task} = ${output}`);
+
+  return output;
 }).pipe(
-  Effect.provide(Layer.mergeAll(MathHarness.layer, GeminiModel))
+  Effect.provide(Layer.mergeAll(
+    MathHarness.layer,
+    GeminiModel,
+    FileSessionRepository.layer(".data/agent-sessions")
+  ))
 );
 
 if (import.meta.main) {
