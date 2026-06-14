@@ -1,10 +1,11 @@
-import { Layer } from "effect";
+import { Effect, Layer, Schema, Stream } from "effect";
 import { BunHttpServer } from "@effect/platform-bun";
-import { HttpRouter } from "effect/unstable/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
-import { ProxusApi } from "@proxus/shared";
+import { LanguageModel } from "effect/unstable/ai";
+import { ProxusApi, TutorChatRequest, TutorChatStreamEvent } from "@proxus/shared";
 import { GeminiModel } from "../../domain/agents/gemini.ts";
-import { TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
+import { TutorChatService, TutorChatServiceLive } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
@@ -20,7 +21,32 @@ const DocsRoute = HttpApiScalar.layer(ProxusApi, {
   path: "/docs"
 });
 
-const Routes = Layer.mergeAll(ApiRoutes, DocsRoute);
+const encoder = new TextEncoder();
+
+const encodeNdjson = (event: TutorChatStreamEvent) =>
+  encoder.encode(`${JSON.stringify(Schema.encodeSync(TutorChatStreamEvent)(event))}\n`);
+
+const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
+  Effect.gen(function* () {
+    const input = yield* HttpServerRequest.schemaBodyJson(TutorChatRequest);
+    const tutor = yield* TutorChatService;
+    const languageModel = yield* LanguageModel.LanguageModel;
+    const body = tutor.streamMessage(input).pipe(
+      Stream.provideService(LanguageModel.LanguageModel, languageModel),
+      Stream.map(encodeNdjson)
+    );
+
+    return HttpServerResponse.stream(body, {
+      contentType: "application/x-ndjson",
+      headers: {
+        "cache-control": "no-cache",
+        "x-accel-buffering": "no"
+      }
+    });
+  })
+);
+
+const Routes = Layer.mergeAll(ApiRoutes, DocsRoute, TutorStreamRoute);
 
 const DomainLive = Layer.mergeAll(
   TutorChatServiceLive,

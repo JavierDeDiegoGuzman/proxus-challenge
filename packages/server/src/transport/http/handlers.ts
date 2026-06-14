@@ -49,7 +49,14 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         Effect.map((items) => ({ artifacts: items.map(artifactSummary) })),
         Effect.orDie
       ))
-      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(Effect.orDie));
+      .handle("get", ({ params }) => artifacts.getArtifact(params.id).pipe(Effect.orDie))
+      .handle("submit", ({ params, payload }) => artifacts.submitAttempt({
+        ...payload,
+        artifactId: params.id
+      }).pipe(
+        Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
+        Effect.orDie
+      ));
   })
 );
 

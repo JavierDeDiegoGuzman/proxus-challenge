@@ -1,10 +1,22 @@
+import { useState } from "react";
+import { ArtifactWorkspace } from "./components/ArtifactWorkspace.tsx";
 import { Chat } from "./components/Chat.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
 export function App() {
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+
   return (
-    <div className="grid min-h-screen grid-cols-[minmax(280px,340px)_minmax(0,1fr)] bg-slate-950 text-slate-100 max-lg:grid-cols-1">
-      <Sidebar />
+    <div
+      className="grid h-screen min-h-screen overflow-hidden bg-slate-950 text-slate-100"
+      style={{
+        gridTemplateColumns: selectedArtifactId === null
+          ? "340px minmax(0, 1fr)"
+          : "340px minmax(0, 1fr) 420px"
+      }}
+    >
+      <Sidebar selectedArtifactId={selectedArtifactId} onSelectArtifact={setSelectedArtifactId} />
+      {selectedArtifactId !== null && <ArtifactWorkspace artifactId={selectedArtifactId} />}
       <Chat />
     </div>
   );

@@ -57,7 +57,8 @@ Available skills:
 ${skillsHelp(spec.skills)}
 
 You initially only know skill names and short descriptions.
-When a task matches a skill description, call load_skill with that skill name before proceeding.
+Skills are not tools and their names are not callable functions.
+When a task matches a skill description, call the load_skill tool with the skill name, for example { "name": "use-uploaded-materials" }.
 Skill text may describe workflows, conventions, examples, or tools available elsewhere in the harness.`;
 
     return {

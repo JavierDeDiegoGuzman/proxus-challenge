@@ -16,6 +16,17 @@ export const TutorChatResponse = Schema.Struct({
 });
 export type TutorChatResponse = typeof TutorChatResponse.Type;
 
+export const TutorChatStreamEvent = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("message"),
+    message: AgentMessage
+  }),
+  Schema.Struct({
+    type: Schema.Literal("done")
+  })
+]);
+export type TutorChatStreamEvent = typeof TutorChatStreamEvent.Type;
+
 export class TutorApi extends HttpApiGroup.make("tutor")
   .add(HttpApiEndpoint.post("chat", "/chat", {
     payload: TutorChatRequest,

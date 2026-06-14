@@ -1,8 +1,12 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh } from "@effect/atom-react";
 import type { AgentMessage } from "@proxus/shared";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useState } from "react";
-import { sendTutorMessageAction } from "../capabilities/tutor/atoms.ts";
+import { useRef, useState } from "react";
+import { Streamdown } from "streamdown";
+import "streamdown/styles.css";
+import { artifactsQuery } from "../domain/artifacts/atoms.ts";
+import { materialsQuery } from "../domain/materials/atoms.ts";
+import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
+import { streamTutorMessage } from "../domain/tutor/stream.ts";
 
 const starterPrompts = [
   "List my uploaded materials",
@@ -13,9 +17,11 @@ const starterPrompts = [
 export function Chat() {
   const [messages, setMessages] = useState<readonly AgentMessage[]>([]);
   const [input, setInput] = useState("");
-  const sendResult = useAtomValue(sendTutorMessageAction);
-  const sendMessage = useAtomSet(sendTutorMessageAction, { mode: "promise" });
-  const isSending = AsyncResult.isWaiting(sendResult);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const refreshArtifacts = useAtomRefresh(artifactsQuery);
+  const refreshMaterials = useAtomRefresh(materialsQuery);
+  const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
 
   const submit = async (nextInput: string) => {
     const trimmed = nextInput.trim();
@@ -23,18 +29,48 @@ export function Chat() {
       return;
     }
 
-    const response = await sendMessage({
-      input: trimmed,
-      messages,
-      maxSteps: 8
-    });
+    setIsSending(true);
+    setError(undefined);
+    pendingInvalidations.current = [];
 
-    setMessages(response.messages);
-    setInput("");
+    try {
+      for await (const event of streamTutorMessage({
+        input: trimmed,
+        messages,
+        maxSteps: 8
+      })) {
+        if (event.type === "done") {
+          continue;
+        }
+
+        const message = event.message;
+        setMessages((current) => [...current, message]);
+
+        if (message.role === "tool-call") {
+          pendingInvalidations.current.push(invalidationsForToolCall(message));
+        }
+
+        if (message.role === "tool-result") {
+          const keys = pendingInvalidations.current.shift() ?? [];
+          if (!message.isFailure) {
+            applyInvalidations(keys, {
+              refreshArtifacts,
+              refreshMaterials
+            });
+          }
+        }
+      }
+
+      setInput("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
-    <main className="grid max-h-screen min-w-0 grid-rows-[auto_1fr_auto_auto]">
+    <main className="grid h-screen max-h-screen min-w-0 grid-rows-[auto_1fr_auto_auto] bg-slate-950 max-md:h-auto max-md:max-h-none">
       <header className="flex items-center justify-between gap-4 border-slate-800 border-b px-6 py-5">
         <div>
           <p className="mb-1 font-bold text-sky-400 text-xs uppercase tracking-widest">Ephemeral session</p>
@@ -75,12 +111,7 @@ export function Chat() {
           : messages.map((message, index) => <MessageBubble key={index} message={message} />)}
       </section>
 
-      {AsyncResult.matchWithError(sendResult, {
-        onInitial: () => null,
-        onError: (error) => <p className="m-0 px-6 pb-3 text-red-200">{String(error)}</p>,
-        onDefect: (defect) => <p className="m-0 px-6 pb-3 text-red-200">{String(defect)}</p>,
-        onSuccess: () => null
-      })}
+      {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-200">{error}</p>}
 
       <form
         className="grid grid-cols-[1fr_auto] gap-3 border-slate-800 border-t bg-slate-950/90 px-6 pt-4 pb-6"
@@ -130,7 +161,9 @@ function MessageBubble({ message }: { readonly message: AgentMessage }) {
       <span className="mb-2 block font-bold text-sky-400 text-xs uppercase tracking-wide">
         {message.role === "user" ? "You" : "Tutor"}
       </span>
-      <p className="m-0 whitespace-pre-wrap text-slate-100 leading-7">{message.content}</p>
+      <div className="text-slate-100 leading-7">
+        <Streamdown>{message.content}</Streamdown>
+      </div>
     </article>
   );
 }

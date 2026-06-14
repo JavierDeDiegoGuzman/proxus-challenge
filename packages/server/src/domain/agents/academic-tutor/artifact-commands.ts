@@ -15,7 +15,7 @@ import {
   type ArtifactRepository
 } from "../../artifacts/artifact.ts";
 
-const CreateArtifactInputFromJson = Schema.fromJsonString(CreateArtifactInput);
+const UnknownFromJson = Schema.fromJsonString(Schema.Unknown);
 const SubmitAttemptInputFromJson = Schema.fromJsonString(SubmitAttemptInput);
 
 const renderArtifact = (artifact: Artifact) => JSON.stringify(artifact, null, 2);
@@ -36,12 +36,70 @@ const renderArtifactError = (error: ArtifactNotFound | AttemptNotFound | Artifac
     case "ArtifactRepositoryStorageError":
       return `Artifact repository storage error: ${String(error.reason)}`;
     case "ArtifactRepositorySerializationError":
-      return `Artifact repository serialization error: ${String(error.reason)}`;
+      return renderSerializationError(error.reason);
   }
 };
 
+const renderSerializationError = (reason: unknown) => {
+  const message = String(reason);
+  const multipleChoiceHint = message.includes("options")
+    ? "\n\nFor multiple-choice questions, options must be objects, not strings: [{\"id\":\"a\",\"text\":\"Option A\"}]. The correctOptionId must match one option id."
+    : "";
+
+  return `Invalid artifact/attempt JSON: ${message}${multipleChoiceHint}\n\nUse artifacts create --help or artifacts submit --help for examples.`;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const optionId = (text: string) => text
+  .trim()
+  .toLocaleLowerCase()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "") || "option";
+
+const normalizeMultipleChoiceQuestion = (question: Record<string, unknown>) => {
+  const options = Array.isArray(question.options)
+    ? question.options.map((option) => typeof option === "string"
+        ? { id: optionId(option), text: option }
+        : option)
+    : question.options;
+
+  const correctOptionId = typeof question.correctOptionId === "string" && Array.isArray(options)
+    ? options.find((option) => isRecord(option) && option.text === question.correctOptionId) !== undefined
+      ? optionId(question.correctOptionId)
+      : question.correctOptionId
+    : question.correctOptionId;
+
+  return {
+    ...question,
+    options,
+    correctOptionId
+  };
+};
+
+const normalizeQuestion = (question: unknown) =>
+  isRecord(question) && question.type === "multiple-choice"
+    ? normalizeMultipleChoiceQuestion(question)
+    : question;
+
+const normalizeCreateArtifactInput = (input: unknown) => {
+  if (!isRecord(input) || !Array.isArray(input.questions)) {
+    return input;
+  }
+
+  return {
+    ...input,
+    questions: input.questions.map(normalizeQuestion)
+  };
+};
+
 const decodeCreateArtifactInput = (json: string) =>
-  Schema.decodeUnknownEffect(CreateArtifactInputFromJson)(json).pipe(
+  Schema.decodeUnknownEffect(UnknownFromJson)(json).pipe(
+    Effect.map(normalizeCreateArtifactInput),
+    Effect.flatMap(Schema.decodeUnknownEffect(CreateArtifactInput)),
     Effect.mapError((reason) => new ArtifactRepositorySerializationError({ reason }))
   );
 

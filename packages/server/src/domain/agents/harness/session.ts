@@ -1,5 +1,5 @@
 import { Effect, Queue, Stream } from "effect";
-import { LanguageModel, Prompt, Tool } from "effect/unstable/ai";
+import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai";
 import type { AgentHarness, AgentToolkit } from "./harness.ts";
 import { isMaterialPageImages } from "../../materials/material.ts";
 import { AgentMessage, type AgentMessage as AgentMessageType } from "./message.ts";
@@ -85,7 +85,12 @@ function execute(
         prompt,
         toolkit,
         toolChoice: "auto" as const
-      });
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) => Effect.succeed(modelErrorResponse(error)),
+          onSuccess: (response) => Effect.succeed(response)
+        })
+      );
 
       for (const toolCall of response.toolCalls) {
         yield* appendMessage(AgentMessage.toolCall(toolCall.name, toolCall.params));
@@ -120,6 +125,21 @@ function execute(
     };
   });
 }
+
+const modelErrorResponse = (error: unknown): LanguageModel.GenerateTextResponse<AgentToolkit["tools"]> =>
+  new LanguageModel.GenerateTextResponse([
+    Response.makePart("text", {
+      text: `I hit an internal model/tool-routing error, so I stopped this turn safely instead of crashing the app.\n\n${formatAgentError(error)}`
+    })
+  ]);
+
+const formatAgentError = (error: unknown) => {
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+
+  return String(error);
+};
 
 const renderPrompt = (
   systemPrompt: string,

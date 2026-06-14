@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
-import { Artifact, ArtifactListResponse } from "../schemas/artifact.ts";
+import { Artifact, ArtifactAttempt, ArtifactListResponse, SubmitAttemptInput } from "../schemas/artifact.ts";
 
 const ArtifactKindQuery = Schema.Struct({
   kind: Schema.optional(Schema.Union([
@@ -21,6 +21,13 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         id: Schema.String
       },
       success: Artifact
+    }),
+    HttpApiEndpoint.post("submit", "/:id/submit", {
+      params: {
+        id: Schema.String
+      },
+      payload: SubmitAttemptInput,
+      success: ArtifactAttempt
     })
   )
   .prefix("/artifacts")

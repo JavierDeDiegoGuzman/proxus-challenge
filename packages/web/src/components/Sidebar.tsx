@@ -1,16 +1,19 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { artifactsQuery } from "../capabilities/artifacts/atoms.ts";
-import { materialsQuery } from "../capabilities/materials/atoms.ts";
+import { artifactsQuery } from "../domain/artifacts/atoms.ts";
+import { materialsQuery } from "../domain/materials/atoms.ts";
 
-export function Sidebar() {
+interface SidebarProps {
+  readonly selectedArtifactId: string | null;
+  readonly onSelectArtifact: (artifactId: string) => void;
+}
+
+export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) {
   const materials = useAtomValue(materialsQuery);
   const artifacts = useAtomValue(artifactsQuery);
-  const refreshMaterials = useAtomRefresh(materialsQuery);
-  const refreshArtifacts = useAtomRefresh(artifactsQuery);
 
   return (
-    <aside className="overflow-y-auto border-slate-800 border-r bg-slate-950 p-5 max-lg:max-h-[45vh] max-lg:border-r-0 max-lg:border-b">
+    <aside className="h-screen overflow-y-auto border-slate-800 border-r bg-slate-950 p-5 max-md:h-auto max-md:max-h-[45vh] max-md:border-r-0 max-md:border-b">
       <div className="mb-8 flex items-center gap-3">
         <div className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 font-extrabold text-white">
           P
@@ -24,9 +27,6 @@ export function Sidebar() {
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="font-semibold text-slate-300 text-sm uppercase tracking-widest">Materials</h2>
-          <button className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 text-xs hover:border-sky-400" type="button" onClick={refreshMaterials}>
-            Refresh
-          </button>
         </div>
         {AsyncResult.matchWithError(materials, {
           onInitial: () => <p className="text-slate-400">Loading materials…</p>,
@@ -55,9 +55,6 @@ export function Sidebar() {
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="font-semibold text-slate-300 text-sm uppercase tracking-widest">Artifacts</h2>
-          <button className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 text-xs hover:border-sky-400" type="button" onClick={refreshArtifacts}>
-            Refresh
-          </button>
         </div>
         {AsyncResult.matchWithError(artifacts, {
           onInitial: () => <p className="text-slate-400">Loading artifacts…</p>,
@@ -72,9 +69,19 @@ export function Sidebar() {
                   </summary>
                   <ul className="grid gap-2 border-slate-800 border-t p-3">
                     {value.artifacts.map((artifact) => (
-                      <li className="rounded-xl bg-slate-950/70 p-3" key={artifact.id}>
-                        <strong className="block text-slate-100">{artifact.title}</strong>
-                        <span className="mt-1 block text-slate-400 text-sm">{artifact.kind} · {artifact.id}</span>
+                      <li key={artifact.id}>
+                        <button
+                          className={`w-full rounded-xl p-3 text-left transition hover:border-sky-500 hover:bg-slate-950 ${
+                            selectedArtifactId === artifact.id
+                              ? "border border-sky-500 bg-sky-950/40"
+                              : "border border-transparent bg-slate-950/70"
+                          }`}
+                          type="button"
+                          onClick={() => onSelectArtifact(artifact.id)}
+                        >
+                          <strong className="block text-slate-100">{artifact.title}</strong>
+                          <span className="mt-1 block text-slate-400 text-sm">{artifact.kind} · {artifact.id}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>

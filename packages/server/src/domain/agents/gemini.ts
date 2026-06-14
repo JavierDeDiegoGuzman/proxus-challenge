@@ -205,19 +205,46 @@ const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>
 const decodeGeminiResponse = (json: unknown) =>
   Schema.decodeUnknownSync(GeminiResponse)(json);
 
-const toResponseParts = (parts: ReadonlyArray<GeminiPart>) => {
+const toResponseParts = (
+  parts: ReadonlyArray<GeminiPart>,
+  tools: LanguageModel.ProviderOptions["tools"]
+) => {
   const functionCall = firstFunctionCall(parts);
 
-  return functionCall?.name === undefined
-    ? parts.flatMap((part) => part.text === undefined ? [] : [Response.makePart("text", { text: part.text })])
-    : [
-        Response.makePart("tool-call", {
-          id: `call_${crypto.randomUUID()}`,
+  if (functionCall?.name === undefined) {
+    return parts.flatMap((part) => part.text === undefined ? [] : [Response.makePart("text", { text: part.text })]);
+  }
+
+  const toolNames = new Set(tools.map((tool) => tool.name));
+
+  const toolCall = toolNames.has(functionCall.name)
+    ? {
+        name: functionCall.name,
+        params: functionCall.args ?? {}
+      }
+    : toolNames.has("load_skill")
+      ? {
+          name: "load_skill",
+          params: { name: functionCall.name }
+        }
+      : {
           name: functionCall.name,
-          params: functionCall.args ?? {},
-          providerExecuted: false
-        })
-      ];
+          params: functionCall.args ?? {}
+        };
+
+  if (!toolNames.has(toolCall.name)) {
+    const availableTools = tools.map((tool) => tool.name).join(", ");
+    throw new Error(`Invalid tool call "${functionCall.name}". Available tools: ${availableTools}.`);
+  }
+
+  return [
+    Response.makePart("tool-call", {
+      id: `call_${crypto.randomUUID()}`,
+      name: toolCall.name,
+      params: toolCall.params,
+      providerExecuted: false
+    })
+  ];
 };
 
 export const GeminiLanguageModelLive = Layer.effect(
@@ -238,7 +265,7 @@ export const GeminiLanguageModelLive = Layer.effect(
           }
 
           const json = decodeGeminiResponse(await response.json());
-          return toResponseParts(json.candidates?.[0]?.content?.parts ?? []);
+          return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
         },
         catch: (cause) => toAiError(cause instanceof Error ? cause.message : String(cause))
       }),
