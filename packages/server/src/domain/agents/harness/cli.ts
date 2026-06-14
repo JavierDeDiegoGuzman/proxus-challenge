@@ -114,6 +114,12 @@ export const Argument = {
       ? Effect.fail(new MissingArgument({ argument: name }))
       : Effect.succeed(value)
   }),
+  optionalString: (name: string): Argument<string | undefined> => withPipe({
+    name,
+    description: name,
+    metavar: `[${name}]`,
+    parse: (value) => Effect.succeed(value)
+  }),
   number: (name: string): Argument<number> => withPipe({
     name,
     description: name,
@@ -141,6 +147,25 @@ export const Argument = {
     parse: (value) => Effect.gen(function* () {
       if (value === undefined) {
         return yield* new MissingArgument({ argument: name });
+      }
+
+      if (!choices.includes(value)) {
+        return yield* new InvalidArgument({ argument: name, value, expected: choices.join(" | ") });
+      }
+
+      return value;
+    })
+  }),
+  optionalChoice: <const Choices extends readonly [string, ...Array<string>]>(
+    name: string,
+    choices: Choices
+  ): Argument<Choices[number] | undefined> => withPipe({
+    name,
+    description: name,
+    metavar: `[${name}:${choices.join("|")}]`,
+    parse: (value) => Effect.gen(function* () {
+      if (value === undefined) {
+        return undefined;
       }
 
       if (!choices.includes(value)) {
@@ -255,7 +280,7 @@ export const executeTokens = (roots: readonly Command[], tokens: readonly string
 
 const executeCommand = (command: Command, tokens: readonly string[], path: string): Effect.Effect<unknown, CliError> =>
   Effect.gen(function* () {
-    if (tokens[0] === "help" || tokens.includes("--help")) {
+    if (tokens[0] === "help") {
       return yield* new HelpRequested({ help: commandHelp(command, path) });
     }
 
@@ -278,6 +303,9 @@ const executeCommand = (command: Command, tokens: readonly string[], path: strin
         return yield* executeCommand(subcommand, rest, `${path} ${subcommand.name}`);
       }
       case "exec":
+        if (tokens.includes("--help")) {
+          return yield* new HelpRequested({ help: commandHelp(command, path) });
+        }
         return yield* command.execute(tokens);
     }
   });

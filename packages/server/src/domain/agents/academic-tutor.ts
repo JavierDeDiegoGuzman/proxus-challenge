@@ -5,18 +5,27 @@ import { SessionRepository, AgentHarness, AgentSession } from "./harness/index.t
 import { GeminiModel } from "./gemini.ts";
 import { FileSessionRepository } from "../../infra/agents/file-session-repository.ts";
 import { MaterialRepository } from "../materials/material.ts";
+import { ArtifactRepository } from "../artifacts/artifact.ts";
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
+import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repository.ts";
 import { makeMaterialCommands } from "./academic-tutor/material-commands.ts";
+import { makeArtifactCommands } from "./academic-tutor/artifact-commands.ts";
 import { AcademicTutorSkills } from "./academic-tutor/skills.ts";
 
-const makeAcademicTutorHarness = (materialRepository: MaterialRepository) => AgentHarness.make({
+export const makeAcademicTutorHarness = (
+  materialRepository: MaterialRepository,
+  artifactRepository: ArtifactRepository
+) => AgentHarness.make({
   name: `You are an academic tutor agent.
 
 You help students understand academic material, especially their uploaded PDF materials.
 Be precise, pedagogical, and honest about what you can infer from the available materials.`,
   skills: AcademicTutorSkills,
-  commands: [makeMaterialCommands(materialRepository)]
+  commands: [
+    makeMaterialCommands(materialRepository),
+    makeArtifactCommands(artifactRepository)
+  ]
 });
 
 export const academicTutorAgent = Effect.gen(function* () {
@@ -24,13 +33,14 @@ export const academicTutorAgent = Effect.gen(function* () {
   const modelName = yield* AiModel.ModelName;
   const sessionRepository = yield* SessionRepository;
   const materialRepository = yield* MaterialRepository;
+  const artifactRepository = yield* ArtifactRepository;
   const task = Bun.argv.slice(2).join(" ").trim() || "List my uploaded materials.";
   const sessionId = Bun.env.AGENT_SESSION_ID ?? "academic-tutor-demo";
   const storedSession = yield* sessionRepository.getSession(sessionId).pipe(
     Effect.catchTag("SessionNotFound", () => sessionRepository.makeSession({ id: sessionId }))
   );
 
-  const harness = makeAcademicTutorHarness(materialRepository);
+  const harness = makeAcademicTutorHarness(materialRepository, artifactRepository);
   const session = AgentSession.make(harness);
 
   console.log(`Provider: ${provider}`);
@@ -74,6 +84,9 @@ export const academicTutorAgent = Effect.gen(function* () {
     ),
     FileMaterialRepository.layer(".data/materials/pdfs").pipe(
       Layer.provide(PopplerPdfService.layer),
+      Layer.provide(BunServices.layer)
+    ),
+    FileArtifactRepository.layer(".data/artifacts").pipe(
       Layer.provide(BunServices.layer)
     )
   ))

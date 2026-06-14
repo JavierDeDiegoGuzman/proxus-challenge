@@ -8,6 +8,7 @@
     "agent:sum": "bun --env-file=../../.env run src/domain/agents/index.ts",
     "agent:math": "bun --env-file=../../.env run src/domain/agents/math.ts",
     "agent:tutor": "bun --env-file=../../.env run src/domain/agents/academic-tutor.ts",
+    "eval:tutor:artifact-authoring": "bun --env-file=../../.env run src/domain/agents/academic-tutor/evals/artifact-authoring.eval.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

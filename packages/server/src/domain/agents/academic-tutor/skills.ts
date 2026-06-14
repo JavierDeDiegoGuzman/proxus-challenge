@@ -44,7 +44,45 @@ export const AcademicTutorSkill = AgentSkill.make({
   ].join("\n")
 });
 
+export const ArtifactAuthoringSkill = AgentSkill.make({
+  name: "artifact-authoring",
+  description: "Create and manage study artifacts: markdown notes, quizzes, tests, submissions, and graded attempts.",
+  content: [
+    "# Artifact authoring",
+    "",
+    "Use this skill when the user asks you to create study notes, quizzes, tests, or practice submissions.",
+    "",
+    "Artifacts are persisted study objects:",
+    "- `note`: title plus markdown content. Notes are not submitted or graded.",
+    "- `quiz`: title plus auto-gradable multiple-choice / true-false questions.",
+    "- `test`: title plus questions. Tests may include multiple-choice, true-false, and short-answer questions.",
+    "",
+    "Available CLI commands:",
+    "- `artifacts list [note|quiz|test]`: list saved artifacts.",
+    "- `artifacts show <artifactId>`: show an artifact JSON.",
+    "- `artifacts create '<json>'`: create a note, quiz, or test from CreateArtifactInput JSON. Always wrap JSON in single quotes.",
+    "- `artifacts submit '<json>'`: submit answers for a quiz or test from SubmitAttemptInput JSON. Always wrap JSON in single quotes.",
+    "- `artifacts attempts [artifactId]`: list attempts.",
+    "- `artifacts grade <attemptId>`: grade and persist a submitted attempt.",
+    "",
+    "CreateArtifactInput examples:",
+    "- `artifacts create '{\"kind\":\"note\",\"title\":\"Derivatives summary\",\"markdown\":\"# Derivatives\\n...\"}'`",
+    "- `artifacts create '{\"kind\":\"quiz\",\"title\":\"Basics quiz\",\"questions\":[{\"type\":\"true-false\",\"id\":\"q1\",\"prompt\":\"2+2=4\",\"correctAnswer\":true,\"explanation\":\"Basic arithmetic.\"}]}'`",
+    "",
+    "SubmitAttemptInput example:",
+    "- `artifacts submit '{\"artifactKind\":\"quiz\",\"artifactId\":\"<id>\",\"answers\":[{\"questionType\":\"true-false\",\"questionId\":\"q1\",\"answer\":true}]}'`",
+    "",
+    "Workflow:",
+    "1. For material-grounded artifacts, inspect the uploaded material first.",
+    "2. Create a compact artifact that directly matches the user's request.",
+    "3. Use stable question ids like `q1`, `q2`, `q3`.",
+    "4. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
+    "5. When a user submits answers, save the attempt and then grade it."
+  ].join("\n")
+});
+
 export const AcademicTutorSkills = [
   AcademicTutorSkill,
-  MaterialGroundingSkill
+  MaterialGroundingSkill,
+  ArtifactAuthoringSkill
 ] as const;
