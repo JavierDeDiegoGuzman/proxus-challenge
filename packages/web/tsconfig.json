@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
-    "tsBuildInfoFile": "../../node_modules/.cache/tsc/web.tsbuildinfo"
+    "tsBuildInfoFile": "../../node_modules/.cache/tsc/web.tsbuildinfo",
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

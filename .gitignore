@@ -39,3 +39,6 @@ report.*.json
 .idea/
 .vscode/
 .DS_Store
+
+# Generated Tailwind CSS
+packages/web/src/styles.generated.css

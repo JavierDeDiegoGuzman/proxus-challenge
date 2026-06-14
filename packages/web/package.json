@@ -3,8 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./src/main.tsx",
   "scripts": {
+    "dev": "tailwindcss -i src/styles.input.css -o src/styles.generated.css && sh -c 'tailwindcss -i src/styles.input.css -o src/styles.generated.css --watch & bun --hot src/server.ts; kill $!'",
+    "build": "tailwindcss -i src/styles.input.css -o src/styles.generated.css --minify && bun build src/index.html --outdir=dist --target=browser",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@effect/atom-react": "4.0.0-beta.83",
+    "@proxus/shared": "workspace:*",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "effect": "4.0.0-beta.83",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.1"
   }
 }

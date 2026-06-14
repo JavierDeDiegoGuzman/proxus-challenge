@@ -2,440 +2,546 @@
 
 ## Context
 
-We have a reusable agent harness with static system prompts, manually loaded skills, a typed/effectful CLI tool, explicit message-based sessions, and append-only persistence. `math.ts` should become only a small example. The next target is an academic tutor agent operated via scripts/CLI first, before frontend/infra.
+We now have a solid academic tutor agent foundation:
 
-The tutor should:
+- agent harness with skills, typed CLI tools, sessions, and evals;
+- academic tutor script;
+- material access for uploaded PDFs, including page rendering as images;
+- artifact system for `note`, `quiz`, and `test` artifacts;
+- artifact authoring evals.
 
-- act as an academic teaching assistant / docente;
-- access user-uploaded learning files;
-- create practice exercises;
-- review learner progress;
-- expose capabilities through manually loaded skills and typed CLI commands;
-- keep dynamic state in messages and repositories, not in mutable system prompts.
+The next phase is to reorganize the agent-related code into clearer domain/application/infra boundaries, then add a small HTTP API and a very simple SPA around it.
 
-## Approach
+Target UX:
 
-Create a domain-centered academic tutor module around four domain areas:
+- Main screen is a chat with the academic tutor.
+- User types messages and receives assistant responses.
+- If the browser refreshes, the chat session is lost.
+- No UI for selecting prior sessions.
+- Sidebar contains:
+  - a dropdown/list of uploaded files/materials;
+  - a dropdown/list of all artifacts.
 
-1. Learning materials / uploaded files
-2. Exercises and attempts
-3. Learner progress
-4. Tutor agent orchestration
+## Effect HTTP docs reviewed
 
-Keep the generic harness untouched where possible. Add tutor-specific models, repositories, skills, and CLI commands. Use repositories as domain ports and file implementations later. For now, scripts can provide file-backed repositories and run the tutor agent from the terminal.
+Reviewed local Effect docs under:
 
-## Domain model design
+- `/Users/javier/.local/share/reference-repos/effect-smol/ai-docs/src/51_http-server`
+- `/Users/javier/.local/share/reference-repos/effect-smol/ai-docs/src/50_http-client`
 
-### Shared value objects
+Relevant pattern from the docs:
 
-- `StudentId`
-- `CourseId`
-- `MaterialId`
-- `ExerciseId`
-- `AttemptId`
-- `SessionId`
-- `Timestamp`
-- `Difficulty`: `intro` | `easy` | `medium` | `hard` | `exam`
-- `SubjectArea`: free string initially, later controlled taxonomy
-- `LearningObjective`: `{ id, description, subject?, prerequisites? }`
+- Define schema-first APIs with `effect/unstable/httpapi`:
+  - `HttpApi`
+  - `HttpApiGroup`
+  - `HttpApiEndpoint`
+  - `HttpApiBuilder`
+  - `HttpApiScalar`
+  - `HttpApiClient`
+- Keep API definitions separate from server implementation so schemas can be shared with frontend/client code.
+- Implement handlers with `HttpApiBuilder.group(Api, "group", ...)`.
+- Serve routes with `HttpRouter.serve(...)` or export a web handler with `HttpRouter.toWebHandler(...)`.
+- Expose OpenAPI via `HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" })`.
+- Serve docs via `HttpApiScalar.layer(Api, { path: "/docs" })`.
+- Use `Schema.TaggedErrorClass` / schema-backed errors for typed API failures.
 
-### Learning materials
+For this project, the API should be schema-first and backed by Effect services/layers, but the first SPA can still be very small.
 
-Represents files uploaded by the user and derived study content.
+## Recommended architecture
+
+### 0. Shared contract layer
+
+Anything the frontend must know should live in `packages/shared`, not in `packages/server`.
+
+This includes:
+
+- public API shape;
+- request/response schemas;
+- public DTO schemas;
+- generated/typed client helpers if we use `HttpApiClient` later.
+
+Suggested structure:
+
+```txt
+packages/shared/src/
+  api/
+    Api.ts
+    tutor.ts
+    materials.ts
+    artifacts.ts
+  schemas/
+    agent-message.ts
+    material-summary.ts
+    artifact-summary.ts
+```
+
+Rules:
+
+- `shared` must not import from `server`.
+- `web` can import from `shared`.
+- `server` can import from `shared` to implement the public API contract.
+- Domain models can be richer than public DTOs; map domain models to shared DTOs at the transport boundary.
+- Only put stable public shapes in `shared`; avoid leaking infra/domain implementation details.
+
+Example dependency direction:
+
+```txt
+web  ------------> shared
+server transport -> shared
+server domain ----> optional shared DTOs only if truly public
+server infra -----> domain ports
+```
+
+Prefer this stricter split:
+
+```txt
+server domain model -> transport mapper -> shared DTO/API response
+```
+
+That keeps the API contract stable even if domain internals change.
+
+### 1. Domain layer
+
+Pure domain models, repository ports, and domain services. No HTTP, no filesystem, no Bun-specific code, no frontend concerns.
+
+Suggested structure:
+
+```txt
+packages/server/src/domain/
+  agents/
+    harness/
+    tutor/
+      tutor-agent.ts
+      tutor-skills.ts
+      tutor-commands.ts
+  artifacts/
+    artifact.ts
+    artifact-repository.ts
+  materials/
+    material.ts
+    material-repository.ts
+    pdf-service.ts
+  sessions/
+    conversation-session.ts        # optional later, if we want domain session naming
+```
+
+Notes:
+
+- Keep generic harness under `domain/agents/harness`.
+- Move academic tutor-specific code out of `domain/agents/academic-tutor.ts` into a folder/module.
+- Keep artifact/material models as Effect Schema source of truth.
+- Keep repositories as Context services / domain ports.
+
+### 2. Application layer
+
+Use cases that orchestrate the domain and the harness. This is the layer the API and CLI scripts call.
+
+Suggested structure:
+
+```txt
+packages/server/src/application/tutor/
+  tutor-chat-service.ts
+  list-materials.ts
+  list-artifacts.ts
+  get-artifact.ts
+```
+
+Core service:
 
 ```ts
-interface LearningMaterial {
-  readonly id: MaterialId;
-  readonly ownerId: StudentId;
-  readonly title: string;
-  readonly source: MaterialSource;
-  readonly mimeType: string;
-  readonly status: "uploaded" | "indexed" | "failed";
-  readonly uploadedAt: string;
-  readonly summary?: string;
-  readonly objectives: readonly LearningObjective[];
-}
+TutorChatService
+  - sendMessage(input): Effect<TutorChatResponse, TutorChatError, ...>
+```
 
-type MaterialSource =
-  | { readonly type: "file"; readonly path: string }
-  | { readonly type: "text"; readonly content: string }
-  | { readonly type: "url"; readonly url: string };
+Important session decision:
 
-interface MaterialChunk {
-  readonly id: string;
-  readonly materialId: MaterialId;
-  readonly index: number;
-  readonly text: string;
-  readonly page?: number;
-  readonly headings: readonly string[];
+- Browser refresh loses session.
+- Therefore the API does not need server-side selectable chat sessions initially.
+- The client can create an ephemeral `sessionId` in memory on page load and pass it to `/chat`.
+- If page refreshes, a new in-memory session starts.
+- We can still reuse `SessionRepository` internally if useful, but for the SPA first pass a process-memory session store may be enough.
+
+Better first implementation:
+
+- API receives the current chat messages from the frontend and returns new messages.
+- Frontend owns ephemeral chat history.
+- No server chat persistence required for SPA v1.
+- Persisted artifacts/materials remain durable.
+
+This aligns with the rule that messages are the source of truth.
+
+### 3. Transport/API layer
+
+Schema-first Effect HTTP API, implemented by the server but defined in `packages/shared`.
+
+Shared API contract:
+
+```txt
+packages/shared/src/api/
+  Api.ts
+  tutor.ts
+  materials.ts
+  artifacts.ts
+```
+
+Server HTTP implementation:
+
+```txt
+packages/server/src/transport/http/
+  handlers.ts
+  server.ts
+```
+
+Endpoints:
+
+#### Tutor chat
+
+```txt
+POST /api/tutor/chat
+```
+
+Payload:
+
+```ts
+{
+  messages: AgentMessage[];
+  input: string;
 }
 ```
 
-Initial scope: plain text / markdown files. PDF/doc parsing can come later.
-
-### Exercises
-
-Represents generated practice tasks.
+Success:
 
 ```ts
-interface Exercise {
-  readonly id: ExerciseId;
-  readonly ownerId: StudentId;
-  readonly materialIds: readonly MaterialId[];
-  readonly objectiveIds: readonly string[];
-  readonly type: ExerciseType;
-  readonly prompt: string;
-  readonly expectedAnswer?: string;
-  readonly rubric: Rubric;
-  readonly difficulty: Difficulty;
-  readonly createdAt: string;
-}
-
-type ExerciseType =
-  | "short-answer"
-  | "multiple-choice"
-  | "worked-problem"
-  | "essay-outline"
-  | "flashcard"
-  | "oral-exam";
-
-interface Rubric {
-  readonly criteria: readonly RubricCriterion[];
-}
-
-interface RubricCriterion {
-  readonly id: string;
-  readonly description: string;
-  readonly points: number;
+{
+  output: string;
+  newMessages: AgentMessage[];
+  messages: AgentMessage[];
 }
 ```
 
-### Attempts and feedback
+No persisted session selection in UI. The frontend keeps `messages` in memory.
 
-Represents learner submissions and tutor review.
+#### Materials sidebar
+
+```txt
+GET /api/materials
+GET /api/materials/:id
+```
+
+Success list can be minimal:
 
 ```ts
-interface ExerciseAttempt {
-  readonly id: AttemptId;
-  readonly exerciseId: ExerciseId;
-  readonly ownerId: StudentId;
-  readonly answer: string;
-  readonly submittedAt: string;
-  readonly feedback?: ExerciseFeedback;
-}
-
-interface ExerciseFeedback {
-  readonly score?: number;
-  readonly maxScore?: number;
-  readonly strengths: readonly string[];
-  readonly gaps: readonly string[];
-  readonly corrections: readonly string[];
-  readonly nextSteps: readonly string[];
-  readonly criterionScores: readonly CriterionScore[];
-}
-
-interface CriterionScore {
-  readonly criterionId: string;
-  readonly pointsAwarded: number;
-  readonly comment: string;
+{
+  materials: Array<{
+    id: string;
+    name: string;
+    pageCount?: number;
+  }>;
 }
 ```
 
-### Learner progress
+#### Artifacts sidebar
 
-Represents durable learning state separate from chat history.
+```txt
+GET /api/artifacts
+GET /api/artifacts/:id
+```
+
+Success list:
 
 ```ts
-interface LearnerProfile {
-  readonly id: StudentId;
-  readonly displayName?: string;
-  readonly goals: readonly string[];
-  readonly preferences: TutorPreferences;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
-interface TutorPreferences {
-  readonly language: "es" | "en";
-  readonly teachingStyle: "socratic" | "direct" | "mixed";
-  readonly feedbackDepth: "brief" | "normal" | "deep";
-}
-
-interface ObjectiveProgress {
-  readonly ownerId: StudentId;
-  readonly objectiveId: string;
-  readonly confidence: number; // 0..1
-  readonly evidence: readonly ProgressEvidence[];
-  readonly updatedAt: string;
-}
-
-interface ProgressEvidence {
-  readonly type: "attempt" | "conversation" | "self-assessment";
-  readonly referenceId: string;
-  readonly summary: string;
-  readonly delta: number;
-  readonly at: string;
+{
+  artifacts: Array<{
+    id: string;
+    type: "note" | "quiz" | "test";
+    title: string;
+  }>;
 }
 ```
 
-## Repository design
+Later endpoints:
 
-Keep repositories in domain as ports. Infra implementations can be file-backed first.
-
-### `MaterialRepository`
-
-- `getMaterial(id)` → fail `MaterialNotFound`
-- `listMaterials(ownerId)`
-- `saveMaterial(material)`
-- `appendChunks(materialId, chunks)`
-- `getChunks(materialId)`
-- `searchMaterials(input)`
-
-Search input initially can be simple text contains / keyword search. Later it can be vector retrieval.
-
-```ts
-interface MaterialSearchInput {
-  readonly ownerId: StudentId;
-  readonly query: string;
-  readonly materialIds?: readonly MaterialId[];
-  readonly limit?: number;
-}
+```txt
+POST /api/artifacts/:id/attempts
+POST /api/artifacts/attempts/:attemptId/grade
 ```
 
-### `ExerciseRepository`
+But for first SPA, artifact interaction can happen through chat/agent commands.
 
-- `getExercise(id)` → fail `ExerciseNotFound`
-- `listExercises(ownerId, filters?)`
-- `saveExercise(exercise)`
-- `saveAttempt(attempt)`
-- `getAttempt(id)`
-- `listAttempts(ownerId, filters?)`
-- `attachFeedback(attemptId, feedback)`
+### 4. Infra layer
 
-### `ProgressRepository`
+Concrete implementations only.
 
-- `getProfile(studentId)`
-- `saveProfile(profile)`
-- `getObjectiveProgress(studentId, objectiveId)`
-- `listObjectiveProgress(studentId)`
-- `recordEvidence(input)`
-- `summarizeProgress(studentId)`
+Suggested structure:
 
-### Existing `SessionRepository`
+```txt
+packages/server/src/infra/
+  agents/
+    file-session-repository.ts
+  artifacts/
+    file-artifact-repository.ts
+  materials/
+    file-material-repository.ts
+    poppler-pdf-service.ts
+  runtime/
+    bun-services.ts              # composition only, if needed
+```
 
-Reuse as-is for chat transcript persistence:
+Rules:
 
-- user messages
-- assistant messages
-- tool calls
-- tool results
+- Infra can depend on filesystem/process services.
+- Prefer Effect platform services: `FileSystem`, `Path`, `ChildProcessSpawner`.
+- Runtime composition can provide `BunServices.layer`.
+- Domain/application/API should not call `Bun.*` directly.
 
-Do not store educational progress in session JSON except as conversation messages. Durable progress belongs to `ProgressRepository`.
+### 5. Web SPA
 
-## CLI command design
+Keep it extremely small.
 
-Expose one public tool, `cli`, with a tutor command group. Commands should be typed/effectful and decoupled from skills.
+Suggested structure:
 
-### Materials
+```txt
+packages/web/src/
+  index.html
+  main.tsx
+  api.ts
+  App.tsx
+  components/
+    Chat.tsx
+    Sidebar.tsx
+    MaterialDropdown.tsx
+    ArtifactDropdown.tsx
+```
 
-- `materials list`
-- `materials inspect --id <materialId>`
-- `materials search --query <text> [--limit <n>]`
-- `materials objectives --id <materialId>`
-- `materials summarize --id <materialId>`
+State:
 
-Later:
+- `messages`: React state only.
+- `input`: React state.
+- `materials`: fetched on load.
+- `artifacts`: fetched on load and refreshed after each assistant response.
 
-- `materials import --path <path> --title <title>`
-- `materials chunk --id <materialId>`
+Refresh behavior:
 
-For the agent, uploads likely happen outside the LLM path; the agent reads/indexes/searches via commands.
+- Since messages are only in React memory, refresh clears chat.
+- No session picker.
 
-### Exercises
+Initial UI:
 
-- `exercises create --objective <objectiveId> --type <type> --difficulty <difficulty> [--material <materialId>]`
-- `exercises list [--objective <objectiveId>] [--status <status>]`
-- `exercises show --id <exerciseId>`
-- `exercises submit --id <exerciseId> --answer <text>`
-- `exercises review --attempt <attemptId>`
+- left sidebar:
+  - Materials dropdown;
+  - Artifacts dropdown.
+- main panel:
+  - chat message list;
+  - input box;
+  - submit button.
 
-The `create` and `review` commands can initially return structured instructions/data for the model to turn into a nice pedagogical response, or they can create deterministic records and let the model generate content based on retrieved material.
+## Proposed API schemas
 
-### Progress
+Use Effect Schema in `packages/shared` for public API schemas. The server domain may have richer internal schemas; transport maps between domain and shared DTOs.
 
-- `progress summary`
-- `progress objectives`
-- `progress objective --id <objectiveId>`
-- `progress record --objective <objectiveId> --delta <number> --summary <text>`
-- `progress recommendations`
+### Chat schemas
 
-### Tutor/session utility
-
-- `tutor profile`
-- `tutor set-goal --goal <text>`
-- `tutor preferences --language <es|en> --style <socratic|direct|mixed>`
-
-## Skill design
-
-Skills remain manually authored docs/capabilities, not executable tools.
-
-### `academic-tutor`
-
-When to use: default teaching behavior.
-
-Content:
-
-- teach patiently;
-- diagnose the student's current understanding;
-- ask one question at a time when appropriate;
-- do not dump full answers if the student asks for practice/help;
-- explain with examples and analogies;
-- cite material snippets when using uploaded files;
-- use `materials search` before claiming uploaded-file facts.
-
-### `socratic-teaching`
-
-When to use: student asks for help solving or understanding.
-
-Content:
-
-- prefer guided questions;
-- reveal hints progressively;
-- identify misconception before giving solution;
-- after student answers, give targeted feedback.
-
-### `exercise-authoring`
-
-When to use: creating practice exercises.
-
-Content:
-
-- align exercise to objective/material;
-- include difficulty, expected answer, and rubric;
-- vary exercise types;
-- avoid testing trivia unless appropriate;
-- use `exercises create` / `exercises show`.
-
-### `feedback-and-grading`
-
-When to use: reviewing submitted answers.
-
-Content:
-
-- grade against rubric;
-- separate strengths, gaps, corrections, next steps;
-- update progress only when evidence supports it;
-- use `exercises review` and `progress record`.
-
-### `study-planning`
-
-When to use: planning study sessions.
-
-Content:
-
-- use progress summary and objectives;
-- prioritize weak/high-value objectives;
-- propose short actionable sessions;
-- include retrieval practice and spaced repetition.
-
-### `material-grounding`
-
-When to use: answering from uploaded files.
-
-Content:
-
-- search materials first;
-- quote or reference relevant chunks;
-- distinguish material-grounded answer from general knowledge;
-- say when uploaded materials do not contain enough evidence.
-
-## Agent design
-
-Create a new tutor agent script alongside `math.ts`, not inside it.
-
-Suggested files:
-
-- `packages/server/src/domain/academic/` for academic domain models/repositories
-- `packages/server/src/domain/agents/academic-tutor.ts` for the agent example script
-- `packages/server/src/domain/agents/academic-tutor/skills.ts`
-- `packages/server/src/domain/agents/academic-tutor/commands.ts`
-
-`math.ts` should remain a tiny smoke-test/example for the harness only.
-
-The tutor harness should use:
+Define a public `AgentMessage` schema in `packages/shared`. The server harness can either use this schema directly or map its internal messages to/from it.
 
 ```ts
-AgentHarness.make({
-  name: "Academic tutor",
-  skills: [AcademicTutorSkill, SocraticTeachingSkill, MaterialGroundingSkill, ExerciseAuthoringSkill, FeedbackAndGradingSkill, StudyPlanningSkill],
-  commands: [materialsCommands, exercisesCommands, progressCommands, tutorCommands]
+ChatRequest = Schema.Struct({
+  messages: Schema.Array(AgentMessage),
+  input: Schema.String
+})
+
+ChatResponse = Schema.Struct({
+  output: Schema.String,
+  newMessages: Schema.Array(AgentMessage),
+  messages: Schema.Array(AgentMessage)
 })
 ```
 
-System prompt should stay static and should only say:
+### Material list schema
 
-- who the agent is;
-- available skills by name/description;
-- how to use `load_skill` and `cli`;
-- safety/teaching boundaries.
+```ts
+MaterialSummary = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  pageCount: Schema.optional(Schema.Number)
+})
+```
 
-The user task remains a user message.
+### Artifact list schema
 
-## Files to modify
+Reuse artifact schema or expose a narrower summary:
 
-Planning only for now. Later likely files:
+```ts
+ArtifactSummary = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Literal("note", "quiz", "test"),
+  title: Schema.String
+})
+```
 
-- `packages/server/src/domain/academic/material.ts`
-- `packages/server/src/domain/academic/exercise.ts`
-- `packages/server/src/domain/academic/progress.ts`
-- `packages/server/src/domain/academic/repositories.ts`
-- `packages/server/src/domain/agents/academic-tutor.ts`
-- `packages/server/src/domain/agents/academic-tutor/skills.ts`
-- `packages/server/src/domain/agents/academic-tutor/commands.ts`
-- `packages/server/src/infra/academic/file-material-repository.ts`
-- `packages/server/src/infra/academic/file-exercise-repository.ts`
-- `packages/server/src/infra/academic/file-progress-repository.ts`
-- `packages/server/package.json`
+## Reorganization steps
 
-## Reuse
+### Step 1: Make `math.ts` obviously an example
 
-- `AgentHarness.make`
-- `AgentSkill.make`
-- `AgentCli.Command`
-- `AgentCli.Argument`
-- `AgentSession.make`
-- existing `SessionRepository`
-- existing `FileSessionRepository`
-- existing `GeminiModel`
+- Keep `math.ts` small.
+- Move serious tutor code out of `domain/agents/academic-tutor.ts` into a folder.
+- Consider `domain/agents/examples/math.ts` later, but not necessary immediately.
 
-## Steps
+### Step 2: Split tutor domain module
 
-- [ ] Keep `math.ts` minimal as harness example.
-- [ ] Add academic domain models using Effect Schema where persistence/decoding is needed.
-- [ ] Add repository interfaces in domain.
-- [ ] Add initial file-backed infra repositories.
-- [ ] Add tutor skills.
-- [ ] Add typed CLI command groups for materials, exercises, progress, and tutor profile.
-- [ ] Add `academic-tutor.ts` script accepting `pnpm --filter @proxus/server run agent:tutor "message"`.
-- [ ] Add sample local data fixture for manual CLI testing.
-- [ ] Verify with a multi-turn script flow: upload/index material, ask explanation, create exercise, submit answer, review progress.
+Move from flat files:
+
+```txt
+packages/server/src/domain/agents/academic-tutor.ts
+packages/server/src/domain/agents/academic-tutor/*
+```
+
+To something like:
+
+```txt
+packages/server/src/domain/agents/tutor/
+  index.ts
+  harness.ts
+  skills.ts
+  commands.ts
+  material-commands.ts
+  artifact-commands.ts
+  evals/
+```
+
+Keep eval imports updated.
+
+### Step 3: Introduce application service
+
+Create:
+
+```txt
+packages/server/src/application/tutor/tutor-chat-service.ts
+```
+
+Responsibilities:
+
+- create `AgentSession` from tutor harness;
+- accept `messages` + `input`;
+- call `session.run` or `session.stream`;
+- return `output`, `newMessages`, `messages`;
+- no frontend or HTTP details.
+
+### Step 4: Add shared HTTP API definitions
+
+Create API schemas/groups in `packages/shared`:
+
+```txt
+packages/shared/src/api/Api.ts
+packages/shared/src/api/tutor.ts
+packages/shared/src/api/materials.ts
+packages/shared/src/api/artifacts.ts
+packages/shared/src/schemas/agent-message.ts
+packages/shared/src/schemas/material-summary.ts
+packages/shared/src/schemas/artifact-summary.ts
+```
+
+Use `HttpApi`, `HttpApiGroup`, `HttpApiEndpoint`, and `Schema` from shared.
+
+### Step 5: Add HTTP handlers
+
+Create:
+
+```txt
+packages/server/src/transport/http/handlers.ts
+```
+
+Implement:
+
+- `POST /api/tutor/chat`
+- `GET /api/materials`
+- `GET /api/artifacts`
+
+Expose:
+
+- `/openapi.json`
+- `/docs`
+
+### Step 6: Add server entrypoint
+
+Create/update:
+
+```txt
+packages/server/src/server.ts
+```
+
+Layer composition:
+
+- API handlers
+- Tutor app service
+- Tutor harness
+- Gemini model
+- material/artifact repositories
+- PDF service
+- Bun platform services at the edge
+
+### Step 7: Add minimal SPA
+
+Build simple React frontend around endpoints.
+
+No auth, no session picker, no persistence of chat in localStorage.
+
+### Step 8: Add eval/test protection
+
+Keep existing artifact authoring eval.
+
+Add deterministic tests for:
+
+- API schemas compile and decode payloads;
+- `TutorChatService` works with mocked repositories;
+- sidebar endpoints list mocked materials/artifacts.
+
+## Files likely to modify
+
+```txt
+packages/server/src/domain/agents/academic-tutor.ts
+packages/server/src/domain/agents/academic-tutor/*
+packages/server/src/domain/agents/harness/message.ts
+packages/server/src/application/tutor/tutor-chat-service.ts
+packages/shared/src/api/Api.ts
+packages/shared/src/api/tutor.ts
+packages/shared/src/api/materials.ts
+packages/shared/src/api/artifacts.ts
+packages/shared/src/schemas/agent-message.ts
+packages/shared/src/schemas/material-summary.ts
+packages/shared/src/schemas/artifact-summary.ts
+packages/server/src/transport/http/handlers.ts
+packages/server/src/server.ts
+packages/server/package.json
+packages/web/src/*
+```
 
 ## Verification
 
-Manual first:
+Server:
 
 ```sh
 pnpm --filter @proxus/server run typecheck
-pnpm --filter @proxus/server run agent:tutor "List my uploaded materials"
-pnpm --filter @proxus/server run agent:tutor "Create a medium exercise about derivatives from my calculus notes"
-pnpm --filter @proxus/server run agent:tutor "Review my last answer and tell me what to practice next"
+pnpm --filter @proxus/server run eval:tutor:artifact-authoring
+pnpm --filter @proxus/server run dev
 ```
 
-Later tests:
+API:
 
-- repository not-found failures;
-- material search returns expected chunks;
-- exercise creation persists records;
-- attempt review attaches feedback;
-- progress evidence updates summaries;
-- tutor CLI help and argument parsing.
+```sh
+curl http://localhost:3000/api/materials
+curl http://localhost:3000/api/artifacts
+curl -X POST http://localhost:3000/api/tutor/chat \
+  -H 'content-type: application/json' \
+  -d '{"messages":[],"input":"Hola, explícame qué archivos tengo."}'
+```
+
+Web:
+
+- open SPA;
+- send a chat message;
+- verify assistant responds;
+- refresh page;
+- verify chat is empty;
+- verify materials/artifacts sidebars reload;
+- create artifact via chat;
+- verify artifacts dropdown refreshes.

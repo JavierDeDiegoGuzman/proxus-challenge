@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.23.0",
   "scripts": {
+    "dev": "pnpm --parallel --filter @proxus/server --filter @proxus/web run dev",
     "prepare": "effect-language-service patch",
     "typecheck": "pnpm -r typecheck",
     "typecheck:root": "tsc --noEmit"
