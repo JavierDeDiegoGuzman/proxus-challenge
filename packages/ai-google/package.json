@@ -1,0 +1,22 @@
+{
+  "name": "@effect/ai-google",
+  "version": "4.0.0-beta.83",
+  "private": true,
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    ".": "./src/index.ts",
+    "./Generated": "./src/Generated.ts",
+    "./GoogleClient": "./src/GoogleClient.ts",
+    "./GoogleConfig": "./src/GoogleConfig.ts",
+    "./GoogleLanguageModel": "./src/GoogleLanguageModel.ts",
+    "./GoogleTool": "./src/GoogleTool.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "effect": "4.0.0-beta.83"
+  }
+}

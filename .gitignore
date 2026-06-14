@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# output
+out/
+dist/
+build/
+*.tgz
+
+# code coverage
+coverage/
+*.lcov
+
+# logs
+logs/
+*.log
+report.*.json
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# caches / temporary files
+.eslintcache
+.cache/
+.turbo/
+.vite/
+.bun/
+*.tsbuildinfo
+.tmp*
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store

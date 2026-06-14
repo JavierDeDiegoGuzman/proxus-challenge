@@ -1,0 +1,16 @@
+{
+  "name": "@proxus/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "agent:sum": "bun --env-file=../../.env run src/domain/agents/index.ts",
+    "agent:math": "bun --env-file=../../.env run src/domain/agents/math.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@effect/ai-google": "workspace:*",
+    "effect": "4.0.0-beta.83"
+  }
+}

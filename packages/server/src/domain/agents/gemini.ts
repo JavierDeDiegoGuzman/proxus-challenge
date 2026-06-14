@@ -1,0 +1,207 @@
+import { Effect, Layer, Schema, Stream } from "effect";
+import {
+  AiError,
+  LanguageModel,
+  Model as AiModel,
+  Response
+} from "effect/unstable/ai";
+
+const defaultModel = "gemini-2.5-flash";
+
+const FunctionCall = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  args: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
+});
+
+const GeminiPart = Schema.Struct({
+  text: Schema.optional(Schema.String),
+  functionCall: Schema.optional(FunctionCall)
+});
+
+const GeminiResponse = Schema.Struct({
+  candidates: Schema.optional(Schema.Array(Schema.Struct({
+    content: Schema.optional(Schema.Struct({
+      parts: Schema.optional(Schema.Array(GeminiPart))
+    }))
+  })))
+});
+
+type GeminiPart = typeof GeminiPart.Type;
+
+const getModelName = () => process.env.GEMINI_MODEL ?? defaultModel;
+
+const getApiKey = () => {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing GOOGLE_GENERATIVE_AI_API_KEY");
+  }
+
+  return apiKey;
+};
+
+const toAiError = (description: string) =>
+  AiError.make({
+    module: "GeminiLanguageModel",
+    method: "generateText",
+    reason: new AiError.UnknownError({ description })
+  });
+
+const promptToText = (prompt: LanguageModel.ProviderOptions["prompt"]) =>
+  prompt.content
+    .flatMap((message) => {
+      if (typeof message.content === "string") {
+        return [message.content];
+      }
+
+      return message.content.flatMap((part) => part.type === "text" ? [part.text] : []);
+    })
+    .join("\n");
+
+const geminiUrl = (model: string, apiKey: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+const toolParameters = (toolName: string) => {
+  switch (toolName) {
+    case "load_skill":
+      return {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Skill name to load" }
+        },
+        required: ["name"]
+      };
+    case "use_tool":
+    case "run_command":
+    case "cli":
+      return {
+        type: "object",
+        properties: {
+          input: { type: "string", description: "Command input string described by a loaded skill" }
+        },
+        required: ["input"]
+      };
+    default:
+      return {
+        type: "object",
+        properties: {
+          a: { type: "number", description: "First number" },
+          b: { type: "number", description: "Second number" }
+        },
+        required: ["a", "b"]
+      };
+  }
+};
+
+const toolDeclarations = (tools: LanguageModel.ProviderOptions["tools"]) =>
+  tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: toolParameters(tool.name)
+  }));
+
+const geminiTools = (tools: LanguageModel.ProviderOptions["tools"]) =>
+  tools.length === 0 ? [] : [{ functionDeclarations: toolDeclarations(tools) }];
+
+const toolChoiceConfig = (options: LanguageModel.ProviderOptions) => {
+  if (options.toolChoice === "none" || options.tools.length === 0) {
+    return undefined;
+  }
+
+  if (options.toolChoice === "required") {
+    return {
+      mode: "ANY",
+      allowedFunctionNames: options.tools.map((tool) => tool.name)
+    };
+  }
+
+  if (typeof options.toolChoice === "object" && "tool" in options.toolChoice) {
+    return {
+      mode: "ANY",
+      allowedFunctionNames: [options.toolChoice.tool]
+    };
+  }
+
+  if (typeof options.toolChoice === "object" && "oneOf" in options.toolChoice) {
+    return options.toolChoice.mode === "required"
+      ? {
+          mode: "ANY",
+          allowedFunctionNames: options.toolChoice.oneOf
+        }
+      : { mode: "AUTO" };
+  }
+
+  return { mode: "AUTO" };
+};
+
+const toolConfig = (options: LanguageModel.ProviderOptions) => {
+  const functionCallingConfig = toolChoiceConfig(options);
+
+  return functionCallingConfig === undefined
+    ? undefined
+    : { functionCallingConfig };
+};
+
+const requestBody = (options: LanguageModel.ProviderOptions) => ({
+  contents: [
+    {
+      role: "user",
+      parts: [{ text: promptToText(options.prompt) }]
+    }
+  ],
+  tools: geminiTools(options.tools),
+  toolConfig: toolConfig(options)
+});
+
+const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>
+  parts.find((part) => part.functionCall?.name !== undefined)?.functionCall;
+
+const decodeGeminiResponse = (json: unknown) =>
+  Schema.decodeUnknownSync(GeminiResponse)(json);
+
+const toResponseParts = (parts: ReadonlyArray<GeminiPart>) => {
+  const functionCall = firstFunctionCall(parts);
+
+  return functionCall?.name === undefined
+    ? parts.flatMap((part) => part.text === undefined ? [] : [Response.makePart("text", { text: part.text })])
+    : [
+        Response.makePart("tool-call", {
+          id: `call_${crypto.randomUUID()}`,
+          name: functionCall.name,
+          params: functionCall.args ?? {},
+          providerExecuted: false
+        })
+      ];
+};
+
+export const GeminiLanguageModelLive = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: (options) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          const response = await fetch(geminiUrl(getModelName(), getApiKey()), {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(requestBody(options)),
+            signal
+          });
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+
+          const json = decodeGeminiResponse(await response.json());
+          return toResponseParts(json.candidates?.[0]?.content?.parts ?? []);
+        },
+        catch: (cause) => toAiError(cause instanceof Error ? cause.message : String(cause))
+      }),
+    streamText: () => Stream.empty
+  })
+);
+
+export const GeminiModel = AiModel.make(
+  "google",
+  getModelName(),
+  GeminiLanguageModelLive
+);
