@@ -1,4 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect";
+import { BunServices } from "@effect/platform-bun";
 import { Model as AiModel } from "effect/unstable/ai";
 import * as AgentCli from "./harness/index.ts";
 import { AgentHarness, AgentSession, AgentSkill, SessionRepository } from "./harness/index.ts";
@@ -153,7 +154,9 @@ export const mathAgent2 = Effect.gen(function* () {
   Effect.provide(Layer.mergeAll(
     MathHarness.layer,
     GeminiModel,
-    FileSessionRepository.layer(".data/agent-sessions")
+    FileSessionRepository.layer(".data/agent-sessions").pipe(
+      Layer.provide(BunServices.layer)
+    )
   ))
 );
 

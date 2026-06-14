@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Path, PlatformError, Schema } from "effect";
+import { Effect, FileSystem, Layer, Path, Schema } from "effect";
 import {
   SessionAlreadyExists,
   SessionNotFound,
@@ -145,35 +145,5 @@ export const FileSessionRepository = {
       appendMessages
     };
   }),
-  layer: (directory: string) => Layer.effect(SessionRepository)(FileSessionRepository.make(directory)).pipe(
-    Layer.provide(Layer.mergeAll(BunFileSystemLive, Path.layer))
-  )
+  layer: (directory: string) => Layer.effect(SessionRepository)(FileSessionRepository.make(directory))
 };
-
-const BunFileSystemLive = FileSystem.layerNoop({
-  exists: (path) => Effect.tryPromise({
-    try: () => Bun.file(path).exists(),
-    catch: (cause) => platformError("exists", path, cause)
-  }),
-  readFileString: (path) => Effect.tryPromise({
-    try: () => Bun.file(path).text(),
-    catch: (cause) => platformError("readFileString", path, cause)
-  }),
-  makeDirectory: (path) => Effect.tryPromise({
-    try: () => Bun.$`mkdir -p ${path}`.quiet().then(() => undefined),
-    catch: (cause) => platformError("makeDirectory", path, cause)
-  }),
-  writeFileString: (path, data) => Effect.tryPromise({
-    try: () => Bun.write(path, data).then(() => undefined),
-    catch: (cause) => platformError("writeFileString", path, cause)
-  })
-});
-
-const platformError = (method: string, path: string, cause: unknown) =>
-  PlatformError.systemError({
-    _tag: "Unknown",
-    module: "BunFileSystemLive",
-    method,
-    pathOrDescriptor: path,
-    cause
-  });

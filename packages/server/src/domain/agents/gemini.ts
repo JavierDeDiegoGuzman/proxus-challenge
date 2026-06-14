@@ -47,19 +47,46 @@ const toAiError = (description: string) =>
     reason: new AiError.UnknownError({ description })
   });
 
+type GeminiContentPart =
+  | { readonly text: string }
+  | { readonly inlineData: { readonly mimeType: string; readonly data: string } };
+
 interface GeminiTextContent {
   readonly role: "user" | "model";
-  readonly parts: readonly [{ readonly text: string }];
+  readonly parts: readonly GeminiContentPart[];
 }
 
-const messageText = (message: LanguageModel.ProviderOptions["prompt"]["content"][number]) => {
+const messageText = (message: LanguageModel.ProviderOptions["prompt"]["content"][number]) =>
+  messageParts(message).flatMap((part) => "text" in part ? [part.text] : []).join("\n");
+
+const messageParts = (message: LanguageModel.ProviderOptions["prompt"]["content"][number]): readonly GeminiContentPart[] => {
   if (typeof message.content === "string") {
-    return message.content;
+    return [{ text: message.content }];
   }
 
-  return message.content
-    .flatMap((part) => part.type === "text" ? [part.text] : [])
-    .join("\n");
+  return message.content.flatMap((part): readonly GeminiContentPart[] => {
+    if (part.type === "text") {
+      return [{ text: part.text }];
+    }
+
+    if (part.type === "file") {
+      const data = fileDataToBase64(part.data);
+      return data === undefined
+        ? []
+        : [{ inlineData: { mimeType: part.mediaType, data } }];
+    }
+
+    return [];
+  });
+};
+
+const fileDataToBase64 = (data: string | Uint8Array | URL) => {
+  if (typeof data !== "string") {
+    return undefined;
+  }
+
+  const dataUrlMatch = /^data:[^;]+;base64,(.*)$/.exec(data);
+  return dataUrlMatch?.[1] ?? data;
 };
 
 const promptSystemInstruction = (prompt: LanguageModel.ProviderOptions["prompt"]) => {
@@ -78,7 +105,7 @@ const promptContents = (prompt: LanguageModel.ProviderOptions["prompt"]): readon
     .filter((message) => message.role !== "system")
     .map((message) => ({
       role: message.role === "assistant" ? "model" : "user",
-      parts: [{ text: messageText(message) }]
+      parts: messageParts(message)
     }));
 
 const geminiUrl = (model: string, apiKey: string) =>

@@ -88,7 +88,7 @@ export interface GroupCommand<Subcommands extends NonEmptyReadonlyArray<Command>
 interface ExecCommandBase extends CommandCommon {
   readonly kind: "exec";
   readonly usage: readonly ParameterUsage[];
-  readonly execute: (tokens: readonly string[]) => Effect.Effect<string, CliError>;
+  readonly execute: (tokens: readonly string[]) => Effect.Effect<unknown, CliError>;
 }
 
 export interface ExecCommand extends ExecCommandBase {
@@ -170,7 +170,7 @@ export const Command = {
   exec: <const P extends Params>(
     name: string,
     parameters: P,
-    run: (input: ParamsInput<P>) => Effect.Effect<string>
+    run: (input: ParamsInput<P>) => Effect.Effect<unknown>
   ): ExecCommand => {
     const usage = parameterUsage(parameters);
     const command: ExecCommandBase = {
@@ -231,13 +231,13 @@ export const tokenize = (input: string): Effect.Effect<readonly string[], CliErr
 
 const unescapeToken = (token: string) => token.replace(/\\(["'\\])/g, "$1");
 
-export const execute = (roots: readonly Command[], input: string): Effect.Effect<string, CliError> =>
+export const execute = (roots: readonly Command[], input: string): Effect.Effect<unknown, CliError> =>
   Effect.gen(function* () {
     const tokens = yield* tokenize(input);
     return yield* executeTokens(roots, tokens);
   });
 
-export const executeTokens = (roots: readonly Command[], tokens: readonly string[]): Effect.Effect<string, CliError> =>
+export const executeTokens = (roots: readonly Command[], tokens: readonly string[]): Effect.Effect<unknown, CliError> =>
   Effect.gen(function* () {
     const [rootName, ...rest] = tokens;
 
@@ -253,7 +253,7 @@ export const executeTokens = (roots: readonly Command[], tokens: readonly string
     return yield* executeCommand(command, rest, command.name);
   });
 
-const executeCommand = (command: Command, tokens: readonly string[], path: string): Effect.Effect<string, CliError> =>
+const executeCommand = (command: Command, tokens: readonly string[], path: string): Effect.Effect<unknown, CliError> =>
   Effect.gen(function* () {
     if (tokens[0] === "help" || tokens.includes("--help")) {
       return yield* new HelpRequested({ help: commandHelp(command, path) });

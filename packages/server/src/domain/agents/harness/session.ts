@@ -1,6 +1,7 @@
 import { Effect, Queue, Stream } from "effect";
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai";
 import type { AgentHarness, AgentToolkit } from "./harness.ts";
+import { isMaterialPageImages } from "../../materials/material.ts";
 import { AgentMessage, type AgentMessage as AgentMessageType } from "./message.ts";
 
 export interface AgentSessionRunOptions {
@@ -149,9 +150,40 @@ const renderMessage = (message: AgentMessageType): Prompt.MessageEncoded => {
         content: `Tool call ${message.name}: ${JSON.stringify(message.input)}`
       };
     case "tool-result":
+      if (!message.isFailure && isMaterialPageImages(message.result)) {
+        const result = message.result;
+        return {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Tool result ${message.name}: rendered pages ${result.pages.map((page) => page.page).join(", ")} from ${result.material.title}.`
+            },
+            ...result.pages.map((page) => ({
+              type: "file" as const,
+              mediaType: page.mediaType,
+              data: page.data,
+              fileName: `${result.material.id}-page-${page.page}.png`
+            }))
+          ]
+        };
+      }
+
       return {
         role: "user",
-        content: `Tool result ${message.name}${message.isFailure ? " failure" : ""}: ${String(message.result)}`
+        content: `Tool result ${message.name}${message.isFailure ? " failure" : ""}: ${formatToolResult(message.result)}`
       };
+  }
+};
+
+const formatToolResult = (result: unknown) => {
+  if (typeof result === "string") {
+    return result;
+  }
+
+  try {
+    return JSON.stringify(result);
+  } catch {
+    return String(result);
   }
 };

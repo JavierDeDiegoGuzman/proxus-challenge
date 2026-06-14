@@ -16,7 +16,7 @@ const Cli = Tool.make("cli", {
   parameters: Schema.Struct({
     input: Schema.String
   }),
-  success: Schema.String,
+  success: Schema.Unknown,
   failure: Schema.String,
   failureMode: "return"
 });
