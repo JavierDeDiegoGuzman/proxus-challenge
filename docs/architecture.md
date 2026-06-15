@@ -10,11 +10,28 @@ flowchart LR
   end
 
   subgraph Server["Node + Effect Server"]
-    Http["HTTP API / NDJSON Stream"]
-    Tutor["TutorChatService"]
-    Harness["Agent Harness"]
-    Materials["Materials Domain"]
-    Artifacts["Artifacts Domain"]
+    direction LR
+
+    subgraph Transport["Transport"]
+      Http["HTTP API"]
+      Stream["NDJSON Stream"]
+      Handlers["HTTP Handlers"]
+    end
+
+    subgraph Domain["Domain"]
+      Tutor["TutorChatService"]
+      Harness["Agent Harness"]
+      Materials["Materials Domain"]
+      Artifacts["Artifacts Domain"]
+    end
+
+    subgraph Infra["Infrastructure adapters"]
+      GeminiAdapter["Gemini adapter"]
+      PopplerService["PopplerPdfService"]
+      FileMaterials["FileMaterialRepository"]
+      FileArtifacts["FileArtifactRepository"]
+      FileSessions["FileSessionRepository"]
+    end
   end
 
   subgraph External["External"]
@@ -31,17 +48,28 @@ flowchart LR
 
   Web --> Atoms
   Atoms -->|"HTTP"| Http
-  Web -->|"NDJSON stream"| Http
-  Http --> Tutor
+  Web -->|"NDJSON"| Stream
+  Http --> Handlers
+  Stream --> Tutor
+  Handlers --> Tutor
+  Handlers --> Materials
+  Handlers --> Artifacts
   Tutor --> Harness
-  Harness --> Gemini
   Harness --> Materials
   Harness --> Artifacts
-  Materials --> Poppler
-  Materials --> PDFs
-  Artifacts --> ArtifactJson
-  Artifacts --> Attempts
-  Harness --> Sessions
+
+  Harness --> GeminiAdapter
+  Materials --> FileMaterials
+  Materials --> PopplerService
+  Artifacts --> FileArtifacts
+  Harness --> FileSessions
+
+  GeminiAdapter --> Gemini
+  PopplerService --> Poppler
+  FileMaterials --> PDFs
+  FileArtifacts --> ArtifactJson
+  FileArtifacts --> Attempts
+  FileSessions --> Sessions
 ```
 
 El repo está organizado como monorepo `pnpm`:
