@@ -5,7 +5,7 @@ Esta lista no es obligatoria para completar el challenge. Sirve para orientar a 
 ## Effect
 
 - Effect docs: <https://effect.website/docs/>
-- Effect Config: <https://www.effect.solutions/config>
+- Effect Solutions: <https://www.effect.solutions>
 - Effect Institute: <https://www.effect.institute/>
 
 Lectura sugerida para este repo:
