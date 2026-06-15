@@ -13,51 +13,37 @@ La app ya tiene una arquitectura funcional, pero no pretende estar terminada. La
 
 ## Qué esperamos ver
 
-No hace falta rehacer el proyecto. Elige una mejora acotada y de alto impacto. Las ideas de abajo son solo inspiración: no son exhaustivas ni limitan lo que puedes proponer.
+Esta repo es un mini MVP de un agente docente. Algunas partes, especialmente el frontend, están deliberadamente vibecodeadas: el objetivo era construir una base funcional sobre la que puedas trabajar, no entregar una app cerrada.
 
-### Posibles líneas de mejora
+No buscamos una mejora pequeña ni una lista de detalles. Buscamos que uses esta base para proponer una evolución con criterio propio. Queremos ver cosas que nos sorprendan: cambios de producto, de arquitectura, de interacción con el agente o de capacidades AI que hagan que el proyecto sea claramente mejor.
 
-Producto/UX:
+Puedes tocar partes grandes del código si lo consideras necesario. Puedes rehacer flujos, UI, agente, tools, skills, schemas o arquitectura. Lo importante es que el resultado tenga sentido como producto, esté bien integrado y puedas explicar todas tus decisiones.
 
-- Mejorar el flujo para crear, seleccionar y resolver artefactos.
-- Diseñar mejores empty states cuando no hay materiales o artifacts.
-- Añadir una forma guiada de importar materiales locales.
-- Mejorar feedback visual durante tool calls, streaming y corrección.
+Los ejemplos de abajo no son una lista cerrada ni una recomendación de alcance. Solo sirven para mostrar el tipo de ambición que esperamos.
 
-Fullstack:
+### Ejemplos de líneas de trabajo
 
-- Hacer más robustos los errores del chat o del workspace.
-- Consolidar schemas duplicados entre dominio server y `shared`.
-- Añadir tests/evals de una parte crítica.
-- Mejorar observabilidad/debuggability de llamadas a tools.
-- Añadir seed/reset scripts para datos demo sin commitear `.data`.
-
-AI:
-
-- Añadir una pequeña capacidad al tutor con buena integración end-to-end.
-- Mejorar prompts/skills para que el modelo use materiales con más precisión.
-- Añadir evaluaciones simples para artifact authoring o corrección.
-- Diseñar guardrails para JSON inválido, tools incorrectas o respuestas incompletas.
-
-Infra/dev experience:
-
-- Mejorar la experiencia de setup y errores de configuración.
-- Mejorar la configuración Node/Vite, scripts de seed/reset o el feedback de errores de setup.
-- Añadir fixtures públicos/sintéticos para probar el flujo sin datos privados.
+- Rediseñar cómo debería funcionar un agente docente realmente útil.
+- Cambiar la forma en la que la persona interactúa con el tutor.
+- Replantear cómo el agente usa materiales, artifacts, tools y memoria.
+- Convertir los quizzes/tests en una experiencia de aprendizaje más rica.
+- Añadir mecanismos para evaluar si el agente está funcionando bien.
+- Mejorar la arquitectura para que sea más mantenible, observable o extensible.
+- Rehacer la UI para que parezca un producto más real.
+- Añadir capacidades nuevas que cambien sustancialmente el valor del producto.
 
 ## Criterios de evaluación
 
 Priorizaremos:
 
-1. **Criterio de producto**: problema claro, solución útil, buen alcance.
+1. **Criterio de producto**: impacto, problema claro, solución útil y buen juicio de alcance.
 2. **Calidad fullstack**: contratos, estados de UI, manejo de errores y experiencia local.
-3. **Uso de AI**: prompts/tools/skills con límites claros y comportamiento observable.
-4. **Arquitectura**: cambios pequeños, integrados en las capas existentes.
-5. **Comunicación**: README/notes que expliquen decisiones y próximos pasos.
+3. **Uso de AI**: prompts, tools, skills, límites claros, comportamiento observable y capacidad de evaluación.
+4. **Arquitectura**: mejoras que hagan el sistema más mantenible, extensible o fácil de razonar.
+5. **Código**: código de calidad, integrado con el sistema y que puedas explicar de principio a fin.
+6. **Comunicación**: README/notes que expliquen decisiones, trade-offs, cómo probarlo y próximos pasos.
 
-## Alcance sugerido
-
-Para una prueba técnica, recomendamos una mejora que pueda entenderse en 2-4 horas de revisión. Mejor una feature pequeña, pulida y explicada que una reescritura grande.
+Nota: la arquitectura y el código de esta repo tienen decisiones deliberadamente simplificadas. Se valoran mejoras sustanciales, siempre que estén bien justificadas e integradas.
 
 ## Cómo entregar
 
@@ -69,10 +55,18 @@ Incluye en tu PR o nota final:
 - qué checks ejecutaste,
 - qué harías después con más tiempo.
 
+## Qué no queremos
+
+- Cambios cosméticos o demasiado pequeños.
+- Una PR que solo arregle detalles sin cambiar el valor del producto.
+- Añadir autenticación o base de datos como mejora principal.
+- Features grandes pero mal integradas.
+- Código que no puedas explicar de principio a fin.
+- Subir secretos, datos privados o contenidos no autorizados.
+
 ## Restricciones útiles
 
 - Mantén `packages/shared` como fuente de contratos entre server y web.
 - Evita meter frameworks nuevos salvo que haya una razón fuerte.
 - Prefiere persistencia local simple; no hace falta añadir base de datos.
-- No subas secretos ni datos privados.
-- Si tocas flujos AI, documenta el comportamiento esperado y los fallos conocidos.
+- Si tocas flujos AI, documenta el comportamiento esperado, los fallos conocidos y cómo lo evaluarías.

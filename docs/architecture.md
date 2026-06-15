@@ -2,12 +2,46 @@
 
 ## Vista general
 
-```txt
-React web app ──HTTP/NDJSON──> Node server ──Gemini/tools──> Tutor agent
-      │                         │
-      └──── shared schemas <────┘
-                                │
-                                └── filesystem .data/ para PDFs, artifacts y sesiones
+```mermaid
+flowchart LR
+  subgraph Browser["Browser"]
+    Web["React + Vite"]
+    Atoms["@effect/atom-react"]
+  end
+
+  subgraph Server["Node + Effect Server"]
+    Http["HTTP API / NDJSON Stream"]
+    Tutor["TutorChatService"]
+    Harness["Agent Harness"]
+    Materials["Materials Domain"]
+    Artifacts["Artifacts Domain"]
+  end
+
+  subgraph External["External"]
+    Gemini["Google Gemini"]
+    Poppler["Poppler CLI"]
+  end
+
+  subgraph Storage["Local .data"]
+    PDFs["materials/pdfs/*.pdf"]
+    ArtifactJson["artifacts/*.json"]
+    Attempts["attempts/*.json"]
+    Sessions["agent-sessions/*.json"]
+  end
+
+  Web --> Atoms
+  Atoms -->|"HTTP"| Http
+  Web -->|"NDJSON stream"| Http
+  Http --> Tutor
+  Tutor --> Harness
+  Harness --> Gemini
+  Harness --> Materials
+  Harness --> Artifacts
+  Materials --> Poppler
+  Materials --> PDFs
+  Artifacts --> ArtifactJson
+  Artifacts --> Attempts
+  Harness --> Sessions
 ```
 
 El repo está organizado como monorepo `pnpm`:
@@ -19,12 +53,14 @@ El repo está organizado como monorepo `pnpm`:
 
 ## Dirección de dependencias
 
-```txt
-web ───────┐
-           ├──> shared
-server ────┘
+```mermaid
+flowchart TD
+  Web["packages/web"] --> Shared["packages/shared"]
+  Server["packages/server"] --> Shared
+  Server --> AiGoogle["packages/ai-google"]
 
-server ───> ai-google
+  Shared -. "no depende de" .-> Web
+  Shared -. "no depende de" .-> Server
 ```
 
 `shared` no debería depender de `server` ni de `web`. Es la capa que evita que el contrato HTTP se duplique manualmente en ambos lados.
@@ -74,6 +110,33 @@ El tutor está implementado como un harness de agente con herramientas públicas
 - `cli`: ejecuta comandos permitidos del dominio.
 
 Las skills no se exponen como tools directas; el modelo debe cargarlas mediante `load_skill`.
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Web as React Chat
+  participant API as /api/tutor/chat/stream
+  participant Tutor as TutorChatService
+  participant Harness as AgentSession
+  participant Gemini
+  participant CLI as Domain CLI tools
+  participant Data as .data
+
+  User->>Web: asks for a quiz
+  Web->>API: POST messages
+  API->>Tutor: streamMessage(input)
+  Tutor->>Harness: continue session
+  Harness->>Gemini: prompt + available tools
+  Gemini-->>Harness: functionCall(load_skill / cli)
+  Harness->>CLI: execute command
+  CLI->>Data: read/write materials/artifacts
+  Data-->>CLI: result
+  CLI-->>Harness: tool result
+  Harness->>Gemini: continue with tool result
+  Gemini-->>Harness: final answer
+  Harness-->>API: AgentMessage events
+  API-->>Web: NDJSON message/done
+```
 
 Puntos de entrada:
 
