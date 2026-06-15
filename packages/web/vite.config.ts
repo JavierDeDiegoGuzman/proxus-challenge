@@ -11,7 +11,7 @@ export default defineConfig({
     host: "0.0.0.0",
     port,
     proxy: {
-      "/api": {
+      "^/api(?:/|$)": {
         target: backendUrl,
         changeOrigin: true
       }

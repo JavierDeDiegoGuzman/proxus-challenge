@@ -1,7 +1,7 @@
 import type { ArtifactKind, SubmitAttemptInput } from "@proxus/shared";
 import { Effect } from "effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import { ApiClient } from "../../api/client.ts";
+import { ApiClient } from "../../api-client/client.ts";
 import { apiRuntime } from "../../lib/runtime.ts";
 
 export const artifactsQuery = apiRuntime

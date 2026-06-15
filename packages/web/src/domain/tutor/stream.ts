@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { TutorChatStreamEvent, type TutorChatRequest, type TutorChatStreamEvent as TutorChatStreamEventType } from "@proxus/shared";
-import { apiClientConfig } from "../../api/config.ts";
+import { apiClientConfig } from "../../api-client/config.ts";
 
 const TutorChatStreamEventFromJsonString = Schema.fromJsonString(TutorChatStreamEvent);
 const decodeEvent = Schema.decodeUnknownSync(TutorChatStreamEventFromJsonString);
