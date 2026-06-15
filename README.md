@@ -24,6 +24,7 @@ packages/
   ai-google/   # Integración local con Gemini para Effect AI
 
 docs/
+  getting-started.md  # Cómo orientarse en la repo y añadir PDFs locales
   architecture.md     # Mapa de arquitectura actual
   development.md      # Setup, scripts y troubleshooting
   effect-primer.md    # Lectura rápida de Effect para este repo
@@ -81,15 +82,16 @@ pnpm --filter @proxus/server run agent:tutor "Crea un quiz corto de una pregunta
 ## Por dónde empezar si estás evaluando el proyecto
 
 1. Lee [`CHALLENGE.md`](./CHALLENGE.md) para entender el contexto y cómo enfocar una mejora.
-2. Lee [`docs/architecture.md`](./docs/architecture.md) para ubicarte en paquetes y capas.
-3. Si Effect no te resulta familiar, lee [`docs/effect-primer.md`](./docs/effect-primer.md) y [`docs/resources.md`](./docs/resources.md).
-4. Ejecuta `pnpm run dev` y prueba el flujo:
+2. Lee [`docs/getting-started.md`](./docs/getting-started.md) para orientarte y añadir PDFs locales.
+3. Lee [`docs/architecture.md`](./docs/architecture.md) para ubicarte en paquetes y capas.
+4. Si Effect no te resulta familiar, lee [`docs/effect-primer.md`](./docs/effect-primer.md) y [`docs/resources.md`](./docs/resources.md).
+5. Ejecuta `pnpm run dev` y prueba el flujo:
    - lista materiales,
    - pide al tutor crear un quiz,
    - abre el artefacto en el workspace,
    - resuélvelo y revisa correcciones.
-5. Si necesitas materiales locales, sigue [`docs/data.md`](./docs/data.md); no subas `.data`.
-6. Antes de entregar cambios, ejecuta [`docs/testing.md`](./docs/testing.md).
+6. Si necesitas más detalle sobre storage local, sigue [`docs/data.md`](./docs/data.md); no subas `.data`.
+7. Antes de entregar cambios, ejecuta [`docs/testing.md`](./docs/testing.md).
 
 ## Nota sobre runtime y package manager
 
