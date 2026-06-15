@@ -77,30 +77,115 @@ Archivos principales:
 
 Aquí se definen endpoints con Effect HTTP API y schemas con `Schema`. El server los implementa y la web los consume.
 
-## Server: dominio, infra y transporte
+## Server: transporte, dominio e infraestructura
 
-Entrada:
+El backend intenta separar tres responsabilidades:
 
-- `packages/server/src/index.ts`
+- **Transporte**: HTTP, streaming, OpenAPI y adaptación request/response.
+- **Dominio**: reglas de negocio, contratos internos, agente, artifacts y materiales.
+- **Infraestructura**: implementaciones concretas contra filesystem, Poppler, Node y proveedores externos.
 
-Transporte HTTP:
+```mermaid
+flowchart TB
+  Entry["src/index.ts"] --> Composition["transport/http/server.ts\nLayer composition"]
 
-- `packages/server/src/transport/http/server.ts`
-- `packages/server/src/transport/http/handlers.ts`
+  subgraph Transport["Transport layer"]
+    HttpServer["transport/http/server.ts"]
+    Handlers["transport/http/handlers.ts"]
+    StreamRoute["/api/tutor/chat/stream"]
+  end
 
-Dominio:
+  subgraph Domain["Domain layer"]
+    TutorService["domain/agents/academic-tutor\nTutorChatService"]
+    Harness["domain/agents/harness\nAgentSession / tools / skills"]
+    MaterialsDomain["domain/materials\nMaterialRepository / PdfService ports"]
+    ArtifactsDomain["domain/artifacts\nArtifactRepository / grading"]
+  end
+
+  subgraph Infra["Infrastructure layer"]
+    Gemini["domain/agents/gemini.ts\nGemini LanguageModel adapter"]
+    FileMaterials["infra/materials\nFileMaterialRepository"]
+    Poppler["infra/materials\nPopplerPdfService"]
+    FileArtifacts["infra/artifacts\nFileArtifactRepository"]
+    FileSessions["infra/agents\nFileSessionRepository"]
+    NodePlatform["@effect/platform-node"]
+  end
+
+  subgraph External["External systems"]
+    Google["Google Gemini API"]
+    PopplerCli["pdfinfo / pdftoppm"]
+    Data["packages/server/.data"]
+  end
+
+  Composition --> Transport
+  Composition --> Domain
+  Composition --> Infra
+
+  Handlers --> TutorService
+  Handlers --> MaterialsDomain
+  Handlers --> ArtifactsDomain
+  StreamRoute --> TutorService
+  TutorService --> Harness
+  Harness --> MaterialsDomain
+  Harness --> ArtifactsDomain
+
+  Gemini --> Google
+  FileMaterials --> Data
+  FileMaterials --> Poppler
+  Poppler --> PopplerCli
+  FileArtifacts --> Data
+  FileSessions --> Data
+  Infra --> NodePlatform
+```
+
+### Transporte
+
+Archivos principales:
+
+- `packages/server/src/index.ts`: arranca el runtime Node y lanza el server.
+- `packages/server/src/transport/http/server.ts`: compone rutas, docs, stream NDJSON y layers.
+- `packages/server/src/transport/http/handlers.ts`: implementa los endpoints definidos en `packages/shared`.
+
+Esta capa debería saber de HTTP, schemas compartidos y serialización, pero no debería contener reglas de negocio complejas.
+
+### Dominio
+
+Archivos principales:
 
 - `packages/server/src/domain/agents/*`
+- `packages/server/src/domain/agents/harness/*`
 - `packages/server/src/domain/artifacts/*`
 - `packages/server/src/domain/materials/*`
 
-Infraestructura:
+Aquí viven los conceptos del producto: tutor, sesiones, skills, commands, materials, artifacts, attempts y grading. También se definen puertos como `MaterialRepository`, `ArtifactRepository` o `PdfService`.
 
+El dominio debería depender de interfaces/servicios, no de detalles como filesystem, Poppler o HTTP.
+
+### Infraestructura
+
+Archivos principales:
+
+- `packages/server/src/infra/agents/file-session-repository.ts`
 - `packages/server/src/infra/artifacts/file-artifact-repository.ts`
 - `packages/server/src/infra/materials/file-material-repository.ts`
 - `packages/server/src/infra/materials/poppler-pdf-service.ts`
+- `packages/server/src/domain/agents/gemini.ts`
 
-La composición de dependencias vive principalmente en `server.ts`, usando `Layer` de Effect y `@effect/platform-node`.
+Esta capa implementa los puertos del dominio usando tecnología concreta: archivos JSON, PDFs locales, comandos Poppler, Gemini y servicios de Node.
+
+Nota: `gemini.ts` está bajo `domain/agents` por cercanía al agente, pero conceptualmente actúa como adapter de infraestructura para `LanguageModel`. Es una de las zonas que un candidato podría reorganizar si quiere dejar las capas más limpias.
+
+### Regla práctica
+
+```txt
+transport -> domain <- infra
+```
+
+- Transporte llama al dominio.
+- Infraestructura implementa puertos que el dominio necesita.
+- El dominio no debería importar transporte ni implementaciones concretas de infraestructura.
+
+La composición de dependencias vive principalmente en `transport/http/server.ts`, usando `Layer` de Effect y `@effect/platform-node`.
 
 ## Tutor agent
 
