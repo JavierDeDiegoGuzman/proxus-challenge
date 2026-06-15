@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Stream } from "effect";
+import { Config, Data, Effect, Layer, Redacted, Schema, Stream } from "effect";
 import {
   AiError,
   LanguageModel,
@@ -28,17 +28,27 @@ const GeminiResponse = Schema.Struct({
 
 type GeminiPart = typeof GeminiPart.Type;
 
-const getModelName = () => process.env.GEMINI_MODEL ?? defaultModel;
+class GeminiConfigError extends Data.TaggedError("GeminiConfigError")<{
+  readonly reason: string;
+}> {}
 
-const getApiKey = () => {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+const GeminiConfig = Effect.gen(function* () {
+  const apiKey = yield* Config.redacted("GOOGLE_GENERATIVE_AI_API_KEY");
+  const model = yield* Config.string("GEMINI_MODEL").pipe(
+    Config.orElse(() => Config.succeed(defaultModel))
+  );
 
-  if (!apiKey) {
-    throw new Error("Missing GOOGLE_GENERATIVE_AI_API_KEY");
+  const apiKeyValue = Redacted.value(apiKey).trim();
+
+  if (apiKeyValue.length === 0) {
+    return yield* new GeminiConfigError({ reason: "Missing GOOGLE_GENERATIVE_AI_API_KEY" });
   }
 
-  return apiKey;
-};
+  return {
+    apiKey: apiKeyValue,
+    model: model.trim().length === 0 ? defaultModel : model.trim()
+  };
+});
 
 const toAiError = (description: string) =>
   AiError.make({
@@ -249,32 +259,36 @@ const toResponseParts = (
 
 export const GeminiLanguageModelLive = Layer.effect(
   LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: (options) =>
-      Effect.tryPromise({
-        try: async (signal) => {
-          const response = await fetch(geminiUrl(getModelName(), getApiKey()), {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(requestBody(options)),
-            signal
-          });
+  Effect.gen(function* () {
+    const config = yield* GeminiConfig;
 
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
+    return yield* LanguageModel.make({
+      generateText: (options) =>
+        Effect.tryPromise({
+          try: async (signal) => {
+            const response = await fetch(geminiUrl(config.model, config.apiKey), {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(requestBody(options)),
+              signal
+            });
 
-          const json = decodeGeminiResponse(await response.json());
-          return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
-        },
-        catch: (cause) => toAiError(cause instanceof Error ? cause.message : String(cause))
-      }),
-    streamText: () => Stream.empty
+            if (!response.ok) {
+              throw new Error(await response.text());
+            }
+
+            const json = decodeGeminiResponse(await response.json());
+            return toResponseParts(json.candidates?.[0]?.content?.parts ?? [], options.tools);
+          },
+          catch: (cause) => toAiError(cause instanceof Error ? cause.message : String(cause))
+        }),
+      streamText: () => Stream.empty
+    });
   })
-);
+).pipe(Layer.orDie);
 
 export const GeminiModel = AiModel.make(
   "google",
-  getModelName(),
+  defaultModel,
   GeminiLanguageModelLive
 );

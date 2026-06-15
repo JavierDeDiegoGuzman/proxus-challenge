@@ -1,6 +1,6 @@
 import { Console, Effect, Layer, Stream } from "effect";
 import { Model as AiModel } from "effect/unstable/ai";
-import { BunServices } from "@effect/platform-bun";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { SessionRepository, AgentHarness, AgentSession } from "./harness/index.ts";
 import { GeminiModel } from "./gemini.ts";
 import { FileSessionRepository } from "../../infra/agents/file-session-repository.ts";
@@ -34,8 +34,8 @@ export const academicTutorAgent = Effect.gen(function* () {
   const sessionRepository = yield* SessionRepository;
   const materialRepository = yield* MaterialRepository;
   const artifactRepository = yield* ArtifactRepository;
-  const task = Bun.argv.slice(2).join(" ").trim() || "List my uploaded materials.";
-  const sessionId = Bun.env.AGENT_SESSION_ID ?? "academic-tutor-demo";
+  const task = process.argv.slice(2).join(" ").trim() || "List my uploaded materials.";
+  const sessionId = process.env.AGENT_SESSION_ID ?? "academic-tutor-demo";
   const storedSession = yield* sessionRepository.getSession(sessionId).pipe(
     Effect.catchTag("SessionNotFound", () => sessionRepository.makeSession({ id: sessionId }))
   );
@@ -80,14 +80,14 @@ export const academicTutorAgent = Effect.gen(function* () {
   Effect.provide(Layer.mergeAll(
     GeminiModel,
     FileSessionRepository.layer(".data/agent-sessions").pipe(
-      Layer.provide(BunServices.layer)
+      Layer.provide(NodeServices.layer)
     ),
     FileMaterialRepository.layer(".data/materials/pdfs").pipe(
       Layer.provide(PopplerPdfService.layer),
-      Layer.provide(BunServices.layer)
+      Layer.provide(NodeServices.layer)
     ),
     FileArtifactRepository.layer(".data/artifacts").pipe(
-      Layer.provide(BunServices.layer)
+      Layer.provide(NodeServices.layer)
     )
   ))
 );

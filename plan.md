@@ -102,7 +102,7 @@ That keeps the API contract stable even if domain internals change.
 
 ### 1. Domain layer
 
-Pure domain models, repository ports, and domain services. No HTTP, no filesystem, no Bun-specific code, no frontend concerns.
+Pure domain models, repository ports, and domain services. No HTTP, no filesystem, no Node-specific code, no frontend concerns.
 
 Suggested structure:
 
@@ -291,8 +291,8 @@ Rules:
 
 - Infra can depend on filesystem/process services.
 - Prefer Effect platform services: `FileSystem`, `Path`, `ChildProcessSpawner`.
-- Runtime composition can provide `BunServices.layer`.
-- Domain/application/API should not call `Bun.*` directly.
+- Runtime composition can provide `NodeServices.layer`.
+- Domain/application/API should not call Node process/filesystem APIs directly.
 
 ### 5. Web SPA
 
@@ -477,7 +477,7 @@ Layer composition:
 - Gemini model
 - material/artifact repositories
 - PDF service
-- Bun platform services at the edge
+- Node platform services at the edge
 
 ### Step 7: Add minimal SPA
 

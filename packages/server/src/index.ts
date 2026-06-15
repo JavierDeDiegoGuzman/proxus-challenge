@@ -1,7 +1,7 @@
 import { Layer } from "effect";
-import { BunRuntime } from "@effect/platform-bun";
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import { HttpServerLive } from "./transport/http/server.ts";
 
 Layer.launch(HttpServerLive).pipe(
-  BunRuntime.runMain
+  NodeRuntime.runMain
 );

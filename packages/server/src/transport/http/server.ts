@@ -1,5 +1,6 @@
 import { Effect, Layer, Schema, Stream } from "effect";
-import { BunHttpServer } from "@effect/platform-bun";
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
+import { createServer } from "node:http";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
@@ -63,7 +64,8 @@ const InfraLive = Layer.mergeAll(
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(
   Layer.provide(DomainLive),
   Layer.provide(InfraLive),
-  Layer.provide(BunHttpServer.layer({
-    port: Number(process.env.PORT ?? "3000")
-  }))
+  Layer.provide(NodeHttpServer.layer(
+    () => createServer(),
+    { port: Number(process.env.PORT ?? "3000") }
+  ))
 );

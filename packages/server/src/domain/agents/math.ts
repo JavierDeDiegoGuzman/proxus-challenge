@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect";
-import { BunServices } from "@effect/platform-bun";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Model as AiModel } from "effect/unstable/ai";
 import * as AgentCli from "./harness/index.ts";
 import { AgentHarness, AgentSession, AgentSkill, SessionRepository } from "./harness/index.ts";
@@ -110,8 +110,8 @@ export const mathAgent2 = Effect.gen(function* () {
   const provider = yield* AiModel.ProviderName;
   const modelName = yield* AiModel.ModelName;
   const repository = yield* SessionRepository;
-  const task = Bun.argv.slice(2).join(" ").trim() || "Calculate ((6 * 7) + (2 ^ 8)) / 10. Use the CLI step by step.";
-  const sessionId = Bun.env.AGENT_SESSION_ID ?? "math-demo";
+  const task = process.argv.slice(2).join(" ").trim() || "Calculate ((6 * 7) + (2 ^ 8)) / 10. Use the CLI step by step.";
+  const sessionId = process.env.AGENT_SESSION_ID ?? "math-demo";
   const storedSession = yield* repository.getSession(sessionId).pipe(
     Effect.catchTag("SessionNotFound", () => repository.makeSession({ id: sessionId }))
   );
@@ -155,7 +155,7 @@ export const mathAgent2 = Effect.gen(function* () {
     MathHarness.layer,
     GeminiModel,
     FileSessionRepository.layer(".data/agent-sessions").pipe(
-      Layer.provide(BunServices.layer)
+      Layer.provide(NodeServices.layer)
     )
   ))
 );

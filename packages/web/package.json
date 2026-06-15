@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./src/main.tsx",
   "scripts": {
-    "dev": "tailwindcss -i src/styles.input.css -o src/styles.generated.css && sh -c 'tailwindcss -i src/styles.input.css -o src/styles.generated.css --watch & bun --hot src/server.ts; kill $!'",
-    "build": "tailwindcss -i src/styles.input.css -o src/styles.generated.css --minify && bun build src/index.html --outdir=dist --target=browser",
+    "dev": "tailwindcss -i src/styles.input.css -o src/styles.generated.css && sh -c 'tailwindcss -i src/styles.input.css -o src/styles.generated.css --watch & vite; kill $!'",
+    "build": "tailwindcss -i src/styles.input.css -o src/styles.generated.css --minify && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -21,6 +21,8 @@
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.1"
+    "@tailwindcss/cli": "^4.3.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.16"
   }
 }
