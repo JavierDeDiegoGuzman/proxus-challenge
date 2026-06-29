@@ -1,6 +1,6 @@
 import { useAtom, useAtomRefresh } from "@effect/atom-react";
 import type { AgentMessage } from "@proxus/shared";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
@@ -8,12 +8,43 @@ import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
 import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
+import { SparkleIcon } from "./icons.tsx";
 
 const starterPrompts = [
   "List my uploaded materials",
   "Create a short quiz from my materials",
   "Explain the hardest concept in my notes step by step"
 ] as const;
+
+type ToolMessage = Extract<AgentMessage, { readonly role: "tool-call" | "tool-result" }>;
+
+interface ThoughtGroup {
+  readonly toolMessages: readonly ToolMessage[];
+  readonly seconds: number | undefined;
+}
+
+interface RenderItem {
+  readonly message: AgentMessage;
+  readonly thought: ThoughtGroup | undefined;
+}
+
+function groupMessages(messages: readonly AgentMessage[], thoughtSeconds: ReadonlyMap<number, number>): readonly RenderItem[] {
+  const items: RenderItem[] = [];
+  let buffer: ToolMessage[] = [];
+
+  messages.forEach((message, index) => {
+    if (message.role === "tool-call" || message.role === "tool-result") {
+      buffer.push(message);
+      return;
+    }
+
+    const thought = buffer.length > 0 ? { toolMessages: buffer, seconds: thoughtSeconds.get(index) } : undefined;
+    buffer = [];
+    items.push({ message, thought });
+  });
+
+  return items;
+}
 
 export function Chat() {
   const [messages, setMessages] = useAtom(tutorMessagesAtom);
@@ -24,10 +55,17 @@ export function Chat() {
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const thoughtSecondsRef = useRef<Map<number, number>>(new Map());
+  const turnStartRef = useRef(0);
+
+  const renderItems = useMemo(
+    () => groupMessages(messages, thoughtSecondsRef.current),
+    [messages]
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isSending]);
 
   const submit = async (nextInput: string) => {
     const trimmed = nextInput.trim();
@@ -37,7 +75,10 @@ export function Chat() {
 
     setIsSending(true);
     setError(undefined);
+    setInput("");
     pendingInvalidations.current = [];
+    turnStartRef.current = Date.now();
+    let nextIndex = messages.length;
 
     try {
       for await (const event of streamTutorMessage({
@@ -50,7 +91,14 @@ export function Chat() {
         }
 
         const message = event.message;
+
+        if (message.role === "assistant") {
+          const seconds = Math.max(1, Math.round((Date.now() - turnStartRef.current) / 1000));
+          thoughtSecondsRef.current.set(nextIndex, seconds);
+        }
+
         setMessages((current) => [...current, message]);
+        nextIndex += 1;
 
         if (message.role === "tool-call") {
           pendingInvalidations.current.push(invalidationsForToolCall(message));
@@ -66,8 +114,6 @@ export function Chat() {
           }
         }
       }
-
-      setInput("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -80,10 +126,10 @@ export function Chat() {
       <header className="flex items-center justify-between gap-4 border-slate-800 border-b px-6 py-5">
         <div>
           <p className="mb-1 font-bold text-sky-400 text-xs uppercase tracking-widest">Ephemeral session</p>
-          <h1 className="m-0 font-bold text-3xl text-slate-100">Academic tutor</h1>
+          <h1 className="m-0 font-bold text-2xl text-slate-100">Academic tutor</h1>
         </div>
         <button
-          className="rounded-full border border-slate-700 px-4 py-2 text-slate-200 hover:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-slate-700 px-4 py-2 text-slate-300 text-sm hover:border-slate-500 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
           type="button"
           onClick={() => setMessages([])}
           disabled={messages.length === 0}
@@ -103,7 +149,7 @@ export function Chat() {
                 <div className="mt-6 grid gap-3">
                   {starterPrompts.map((prompt) => (
                     <button
-                      className="rounded-2xl border border-slate-700 bg-slate-900 p-4 text-slate-200 hover:border-sky-400"
+                      className="rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-sky-500"
                       key={prompt}
                       type="button"
                       onClick={() => void submit(prompt)}
@@ -114,28 +160,40 @@ export function Chat() {
                 </div>
               </div>
             )
-          : messages.map((message, index) => <MessageBubble key={index} message={message} />)}
+          : renderItems.map((item, index) => (
+              <Fragment key={index}>
+                {item.thought !== undefined && <ThoughtBlock thought={item.thought} />}
+                <MessageBubble message={item.message} />
+              </Fragment>
+            ))}
+        {isSending && <TypingIndicator />}
         <div ref={bottomRef} />
       </section>
 
-      {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-200">{error}</p>}
+      {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-300 text-sm">{error}</p>}
 
       <form
-        className="grid grid-cols-[1fr_auto] gap-3 border-slate-800 border-t bg-slate-950/90 px-6 pt-4 pb-6"
+        className="grid grid-cols-[1fr_auto] gap-3 border-slate-800 border-t bg-slate-950/95 px-6 pt-4 pb-6"
         onSubmit={(event) => {
           event.preventDefault();
           void submit(input);
         }}
       >
         <textarea
-          className="w-full resize-y rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 outline-none focus:border-transparent focus:ring-2 focus:ring-sky-400"
+          className="w-full resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 leading-6 outline-none focus:border-transparent focus:ring-2 focus:ring-sky-400"
           value={input}
           onChange={(event) => setInput(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void submit(input);
+            }
+          }}
           placeholder="Ask your tutor something…"
-          rows={3}
+          rows={1}
         />
         <button
-          className="self-end rounded-full border border-slate-700 bg-slate-900 px-5 py-3 text-slate-100 hover:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="self-end rounded-full bg-sky-600 px-6 py-3 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
           type="submit"
           disabled={isSending || input.trim().length === 0}
         >
@@ -146,31 +204,85 @@ export function Chat() {
   );
 }
 
-function MessageBubble({ message }: { readonly message: AgentMessage }) {
-  if (message.role === "tool-call" || message.role === "tool-result") {
+function Avatar({ role }: { readonly role: "user" | "assistant" }) {
+  if (role === "user") {
     return (
-      <details className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-400">
-        <summary className="cursor-pointer">
-          {message.role === "tool-call" ? `Tool call: ${message.name}` : `Tool result: ${message.name}`}
-        </summary>
-        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-sm">
-          {JSON.stringify(message.role === "tool-call" ? message.input : message.result, null, 2)}
-        </pre>
-      </details>
+      <div className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-700 font-bold text-slate-200 text-xs">
+        You
+      </div>
     );
   }
 
   return (
-    <article className={message.role === "user"
-      ? "max-w-3xl self-end rounded-2xl border border-blue-700 bg-blue-950 p-4"
-      : "max-w-3xl self-start rounded-2xl border border-slate-800 bg-slate-900 p-4"}
-    >
-      <span className="mb-2 block font-bold text-sky-400 text-xs uppercase tracking-wide">
-        {message.role === "user" ? "You" : "Tutor"}
-      </span>
-      <div className="text-slate-100 leading-7">
-        <Streamdown>{message.content}</Streamdown>
+    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 font-bold text-white text-xs">
+      T
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-start gap-3">
+      <Avatar role="assistant" />
+      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3.5">
+        {[0, 1, 2].map((dot) => (
+          <span
+            className="size-1.5 animate-bounce rounded-full bg-slate-500"
+            key={dot}
+            style={{ animationDelay: `${dot * 120}ms` }}
+          />
+        ))}
       </div>
-    </article>
+    </div>
+  );
+}
+
+function ThoughtBlock({ thought }: { readonly thought: ThoughtGroup }) {
+  const label = thought.seconds !== undefined ? `Thought for ${thought.seconds}s` : "Thought";
+
+  return (
+    <details className="ml-11 max-w-[85%] rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-1.5 text-slate-500 text-xs">
+      <summary className="flex cursor-pointer select-none items-center gap-1.5">
+        <SparkleIcon className="size-3" />
+        {label}
+      </summary>
+      <div className="mt-2 grid gap-2 border-slate-800/60 border-t pt-2">
+        {thought.toolMessages.map((message, index) => (
+          <div key={index}>
+            <p className="font-semibold text-slate-400">
+              {message.role === "tool-call" ? `Called ${message.name}` : `Result from ${message.name}${message.isFailure ? " (failed)" : ""}`}
+            </p>
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-slate-500">
+              {JSON.stringify(message.role === "tool-call" ? message.input : message.result, null, 2)}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function MessageBubble({ message }: { readonly message: AgentMessage }) {
+  if (message.role === "tool-call" || message.role === "tool-result") {
+    return null;
+  }
+
+  const isUser = message.role === "user";
+
+  return (
+    <div className={`flex items-start gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
+      <Avatar role={message.role} />
+      <article
+        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+          isUser
+            ? "bg-sky-600 text-white"
+            : "border border-slate-800 bg-slate-900 text-slate-100"
+        }`}
+      >
+        <div className="text-[15px] leading-7">
+          <Streamdown>{message.content}</Streamdown>
+        </div>
+      </article>
+    </div>
   );
 }

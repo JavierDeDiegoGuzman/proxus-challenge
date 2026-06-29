@@ -1,9 +1,17 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { ArtifactKind } from "@proxus/shared";
 import { useRef, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { materialsQuery, uploadMaterialAction } from "../domain/materials/atoms.ts";
 import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
+import { DocumentIcon, NoteIcon, QuizIcon, TestIcon, UploadIcon } from "./icons.tsx";
+
+const artifactIcons: Record<ArtifactKind, typeof NoteIcon> = {
+  note: NoteIcon,
+  quiz: QuizIcon,
+  test: TestIcon
+};
 
 interface SidebarProps {
   readonly selectedArtifactId: string | null;
@@ -15,7 +23,7 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
   const artifacts = useAtomValue(artifactsQuery);
 
   return (
-    <aside className="h-screen overflow-y-auto border-slate-800 border-r bg-slate-950 p-5 max-md:h-auto max-md:max-h-[45vh] max-md:border-r-0 max-md:border-b">
+    <aside className="h-screen overflow-x-hidden overflow-y-auto border-slate-800 border-r bg-slate-950 p-5 max-md:h-auto max-md:max-h-[45vh] max-md:border-r-0 max-md:border-b">
       <div className="mb-8 flex items-center gap-3">
         <div className="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 font-extrabold text-white">
           P
@@ -42,11 +50,14 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
                   <summary className="cursor-pointer px-4 py-3 font-medium text-slate-100 marker:text-sky-400">
                     {value.materials.length} material{value.materials.length === 1 ? "" : "s"}
                   </summary>
-                  <ul className="grid gap-2 border-slate-800 border-t p-3">
+                  <ul className="grid grid-cols-1 gap-2 border-slate-800 border-t p-3">
                     {value.materials.map((material) => (
-                      <li className="rounded-xl bg-slate-950/70 p-3" key={material.id}>
-                        <strong className="block text-slate-100">{material.title}</strong>
-                        <span className="mt-1 block text-slate-400 text-sm">{material.pageCount} pages · {material.fileName}</span>
+                      <li className="flex min-w-0 items-start gap-2.5 rounded-xl bg-slate-950/70 p-3" key={material.id} title={material.title}>
+                        <DocumentIcon className="mt-0.5 size-4 shrink-0 text-sky-400" />
+                        <div className="min-w-0">
+                          <strong className="block truncate text-slate-100">{material.title}</strong>
+                          <span className="mt-1 block truncate text-slate-400 text-sm" title={material.fileName}>{material.pageCount} pages · {material.fileName}</span>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -70,23 +81,30 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
                   <summary className="cursor-pointer px-4 py-3 font-medium text-slate-100 marker:text-sky-400">
                     {value.artifacts.length} artifact{value.artifacts.length === 1 ? "" : "s"}
                   </summary>
-                  <ul className="grid gap-2 border-slate-800 border-t p-3">
-                    {value.artifacts.map((artifact) => (
-                      <li key={artifact.id}>
-                        <button
-                          className={`w-full rounded-xl p-3 text-left transition hover:border-sky-500 hover:bg-slate-950 ${
-                            selectedArtifactId === artifact.id
-                              ? "border border-sky-500 bg-sky-950/40"
-                              : "border border-transparent bg-slate-950/70"
-                          }`}
-                          type="button"
-                          onClick={() => onSelectArtifact(artifact.id)}
-                        >
-                          <strong className="block text-slate-100">{artifact.title}</strong>
-                          <span className="mt-1 block text-slate-400 text-sm">{artifact.kind} · {artifact.id}</span>
-                        </button>
-                      </li>
-                    ))}
+                  <ul className="grid grid-cols-1 gap-2 border-slate-800 border-t p-3">
+                    {value.artifacts.map((artifact) => {
+                      const ArtifactIcon = artifactIcons[artifact.kind];
+                      return (
+                        <li className="min-w-0" key={artifact.id}>
+                          <button
+                            className={`flex w-full min-w-0 items-start gap-2.5 rounded-xl p-3 text-left transition hover:border-sky-500 hover:bg-slate-950 ${
+                              selectedArtifactId === artifact.id
+                                ? "border border-sky-500 bg-sky-950/40"
+                                : "border border-transparent bg-slate-950/70"
+                            }`}
+                            type="button"
+                            onClick={() => onSelectArtifact(artifact.id)}
+                            title={artifact.title}
+                          >
+                            <ArtifactIcon className="mt-0.5 size-4 shrink-0 text-sky-400" />
+                            <div className="min-w-0">
+                              <strong className="block truncate text-slate-100">{artifact.title}</strong>
+                              <span className="mt-1 block truncate text-slate-400 text-sm">{artifact.kind} · {artifact.id}</span>
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </details>
               )
@@ -146,7 +164,8 @@ function MaterialUploadZone() {
         }}
         type="button"
       >
-        <span className="text-slate-300 text-sm">
+        <span className="flex items-center gap-2 text-slate-300 text-sm">
+          <UploadIcon className="size-4" />
           {isUploading ? "Uploading…" : "Drop a PDF here or click to browse"}
         </span>
       </button>

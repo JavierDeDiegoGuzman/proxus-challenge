@@ -30,7 +30,7 @@ export function ArtifactWorkspace({ artifactId }: ArtifactWorkspaceProps) {
 
 function EmptyWorkspace() {
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       <div className="grid h-full place-items-center rounded-3xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center">
         <div>
           <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">Practice workspace</p>
@@ -46,7 +46,7 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
   const artifact = useAtomValue(artifactQuery(artifactId));
 
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950/60 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       {AsyncResult.matchWithError(artifact, {
         onInitial: () => <p className="text-slate-400">Loading artifact…</p>,
         onError: (error) => <p className="text-red-200">{String(error)}</p>,
@@ -79,6 +79,25 @@ function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { reado
   );
 }
 
+function ExerciseStatus({ status }: { readonly status: "not-started" | "in-progress" | "completed" }) {
+  const styles = {
+    "not-started": "border-slate-700 text-slate-400",
+    "in-progress": "border-amber-700 text-amber-300",
+    completed: "border-emerald-700 text-emerald-300"
+  } as const;
+  const labels = {
+    "not-started": "Not started",
+    "in-progress": "In progress",
+    completed: "Completed"
+  } as const;
+
+  return (
+    <span className={`rounded-full border px-3 py-1 font-semibold text-xs uppercase tracking-wide ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+}
+
 function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "quiz" | "test" }> }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [attempt, setAttempt] = useState<ArtifactAttempt | null>(null);
@@ -91,6 +110,12 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
     () => artifact.questions.filter((question) => (answers[question.id] ?? "").trim().length === 0),
     [answers, artifact.questions]
   );
+
+  const status = attempt !== null
+    ? "completed"
+    : unansweredQuestions.length === artifact.questions.length
+      ? "not-started"
+      : "in-progress";
 
   const setAnswer = (questionId: string, value: string) => {
     setAnswers((current) => ({ ...current, [questionId]: value }));
@@ -118,9 +143,12 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
 
   return (
     <article className="mx-auto max-w-4xl">
-      <header className="mb-5 rounded-3xl border border-slate-800 bg-slate-900 p-6">
-        <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">{artifact.kind}</p>
-        <h2 className="font-bold text-3xl text-slate-100">{artifact.title}</h2>
+      <header className="mb-6">
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <p className="font-bold text-sky-400 text-xs uppercase tracking-widest">{artifact.kind}</p>
+          <ExerciseStatus status={status} />
+        </div>
+        <h2 className="font-bold text-4xl text-slate-100">{artifact.title}</h2>
         <p className="mt-2 text-slate-400">Answer every question, submit, and review your corrections.</p>
       </header>
 
@@ -152,7 +180,7 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
                     : `${unansweredQuestions.length} question${unansweredQuestions.length === 1 ? "" : "s"} unanswered.`}
                 </p>
                 <button
-                  className="rounded-full bg-sky-400 px-5 py-2 font-semibold text-slate-950 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full bg-sky-600 px-6 py-2.5 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                   type="button"
                   disabled={unansweredQuestions.length > 0 || isSubmitting}
                   onClick={submit}
@@ -198,7 +226,7 @@ function QuestionCard({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
+    <section className="rounded-3xl border border-slate-700/80 bg-slate-900 p-5 shadow-lg shadow-black/30">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <p className="mb-2 text-slate-400 text-sm">Question {index + 1} · {question.type}</p>
@@ -300,7 +328,13 @@ function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt
 
 function CorrectionBadge({ correction }: { readonly correction: QuestionCorrection }) {
   if (correction.questionType === "short-answer") {
-    return <span className="rounded-full bg-sky-950 px-3 py-1 font-semibold text-sky-200 text-sm">{correction.score}/{correction.maxScore}</span>;
+    const ratio = correction.maxScore === 0 ? 1 : correction.score / correction.maxScore;
+    const badgeClass = ratio >= 1
+      ? "bg-emerald-950 text-emerald-200"
+      : ratio > 0
+        ? "bg-amber-950 text-amber-200"
+        : "bg-red-950 text-red-200";
+    return <span className={`rounded-full px-3 py-1 font-semibold text-sm ${badgeClass}`}>{correction.score}/{correction.maxScore}</span>;
   }
 
   return correction.correct
