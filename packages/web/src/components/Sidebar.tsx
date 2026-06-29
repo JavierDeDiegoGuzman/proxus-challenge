@@ -1,7 +1,9 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useRef, useState } from "react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
-import { materialsQuery } from "../domain/materials/atoms.ts";
+import { materialsQuery, uploadMaterialAction } from "../domain/materials/atoms.ts";
+import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
 
 interface SidebarProps {
   readonly selectedArtifactId: string | null;
@@ -28,6 +30,7 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="font-semibold text-slate-300 text-sm uppercase tracking-widest">Materials</h2>
         </div>
+        <MaterialUploadZone />
         {AsyncResult.matchWithError(materials, {
           onInitial: () => <p className="text-slate-400">Loading materials…</p>,
           onError: (error) => <p className="text-red-200">{String(error)}</p>,
@@ -90,5 +93,77 @@ export function Sidebar({ selectedArtifactId, onSelectArtifact }: SidebarProps) 
         })}
       </section>
     </aside>
+  );
+}
+
+function MaterialUploadZone() {
+  const upload = useAtomSet(uploadMaterialAction, { mode: "promise" });
+  const appendTutorMessage = useAtomSet(tutorMessagesAtom);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggedOver, setIsDraggedOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const uploadFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Only .pdf files are supported.");
+      return;
+    }
+
+    setIsUploading(true);
+    setError(undefined);
+
+    try {
+      const result = await upload(file);
+      appendTutorMessage((current) => [...current, { role: "assistant", content: result.tutorNote }]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="mb-3">
+      <button
+        className={`grid w-full place-items-center rounded-2xl border-2 border-dashed p-4 text-center transition ${
+          isDraggedOver ? "border-sky-400 bg-sky-950/30" : "border-slate-700 bg-slate-900/40 hover:border-sky-500"
+        }`}
+        disabled={isUploading}
+        onClick={() => fileInputRef.current?.click()}
+        onDragLeave={() => setIsDraggedOver(false)}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDraggedOver(true);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setIsDraggedOver(false);
+          const file = event.dataTransfer.files[0];
+          if (file !== undefined) {
+            void uploadFile(file);
+          }
+        }}
+        type="button"
+      >
+        <span className="text-slate-300 text-sm">
+          {isUploading ? "Uploading…" : "Drop a PDF here or click to browse"}
+        </span>
+      </button>
+      <input
+        accept=".pdf"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file !== undefined) {
+            void uploadFile(file);
+          }
+          event.target.value = "";
+        }}
+        ref={fileInputRef}
+        type="file"
+      />
+      {error !== undefined && <p className="mt-2 text-red-300 text-sm">{error}</p>}
+    </div>
   );
 }

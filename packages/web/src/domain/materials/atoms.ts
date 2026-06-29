@@ -10,3 +10,15 @@ export const materialsQuery = apiRuntime
     ).pipe(Effect.withSpan("materials.list", { kind: "client" }))
   )
   .pipe(Atom.keepAlive, Atom.withReactivity(["materials"]));
+
+export const uploadMaterialAction = apiRuntime.fn(
+  (file: File) => {
+    const formData = new FormData();
+    formData.set("file", file);
+
+    return ApiClient.use((client) =>
+      client.materials.upload({ payload: formData })
+    ).pipe(Effect.withSpan("materials.upload", { kind: "client" }));
+  },
+  { reactivityKeys: ["materials"] }
+);
