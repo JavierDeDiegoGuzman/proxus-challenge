@@ -18,7 +18,8 @@ export const CreateStudyArtifactsSkill = AgentSkill.make({
     "- `artifacts show <artifactId>`: show an artifact JSON.",
     "- `artifacts create '<json>'`: create a note, quiz, or test from CreateArtifactInput JSON. Always wrap JSON in single quotes.",
     "- `artifacts submit '<json>'`: submit answers for a quiz or test from SubmitAttemptInput JSON. Always wrap JSON in single quotes.",
-    "- `artifacts attempts [artifactId]`: list attempts.",
+    "- `artifacts attempts [artifactId]`: list attempts (summary only, no score).",
+    "- `artifacts attempt <attemptId>`: show one attempt's full details, including score and corrections if already graded. Use this whenever the user asks about quiz/test results.",
     "- `artifacts grade <attemptId>`: grade and persist a submitted attempt.",
     "",
     "CreateArtifactInput examples:",
@@ -38,6 +39,7 @@ export const CreateStudyArtifactsSkill = AgentSkill.make({
     "2. Create a compact artifact that directly matches the user's request.",
     "3. Use stable question ids like `q1`, `q2`, `q3`.",
     "4. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
-    "5. When a user submits answers, save the attempt and then grade it."
+    "5. When a user submits answers, save the attempt and then grade it.",
+    "6. When the user asks to see quiz/test results later (e.g. \"show me my quiz results\"), use `artifacts attempts` to find the attempt id, then `artifacts attempt <attemptId>` to read score and corrections. Do not say results are missing without checking this first."
   ].join("\n")
 });
