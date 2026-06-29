@@ -3,6 +3,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { ProxusApi } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
 import { runMaterialUploadPipeline, runQuizReviewPipeline } from "../../domain/agents/academic-tutor/pipelines.ts";
+import { reviewShortAnswers } from "../../domain/agents/academic-tutor/short-answer-review.ts";
 import { ArtifactRepository, type Artifact } from "../../domain/artifacts/artifact.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 
@@ -68,6 +69,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
       }).pipe(
         Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
         Effect.orDie,
+        Effect.flatMap((attempt) => reviewShortAnswers(artifacts, attempt)),
         Effect.flatMap((attempt) => runQuizReviewPipeline(materials, artifacts, attempt.id).pipe(
           Effect.map((tutorNote) => ({ attempt, tutorNote }))
         ))

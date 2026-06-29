@@ -4,7 +4,9 @@ import { makeAcademicTutorHarness } from "../academic-tutor.ts";
 import type { ArtifactRepository } from "../../artifacts/artifact.ts";
 import type { MaterialRepository } from "../../materials/material.ts";
 
-const PIPELINE_MAX_STEPS = 4;
+// 4 was too tight in practice: the model sometimes calls load_skill before
+// the actual data lookup, leaving no step left to turn the result into text.
+const PIPELINE_MAX_STEPS = 6;
 
 const runPipeline = (
   materialRepository: MaterialRepository,
