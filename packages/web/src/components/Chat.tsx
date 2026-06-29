@@ -96,11 +96,11 @@ export function Chat() {
         {messages.length === 0
           ? (
               <div className="m-auto w-full max-w-3xl text-center">
-                <h2 className="m-0 text-balance font-bold text-4xl text-slate-100 leading-tight md:text-6xl">
+                <h2 className="m-0 text-balance font-bold text-2xl text-slate-100 leading-snug">
                   Ask about your materials, notes, quizzes, or tests.
                 </h2>
-                <p className="mt-4 text-slate-400">The chat history lives only in browser memory. Refreshing starts over.</p>
-                <div className="mt-6 grid grid-cols-3 gap-3 max-lg:grid-cols-1">
+                <p className="mt-3 text-slate-400 text-sm">The chat history lives only in browser memory. Refreshing starts over.</p>
+                <div className="mt-6 grid gap-3">
                   {starterPrompts.map((prompt) => (
                     <button
                       className="rounded-2xl border border-slate-700 bg-slate-900 p-4 text-slate-200 hover:border-sky-400"

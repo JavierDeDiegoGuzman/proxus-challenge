@@ -1,22 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArtifactWorkspace } from "./components/ArtifactWorkspace.tsx";
 import { Chat } from "./components/Chat.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 
+const MIN_CHAT_WIDTH = 320;
+const MAX_CHAT_WIDTH = 720;
+
 export function App() {
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [chatWidth, setChatWidth] = useState(420);
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const onMouseMove = (event: MouseEvent) => {
+      const nextWidth = window.innerWidth - event.clientX;
+      setChatWidth(Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, nextWidth)));
+    };
+    const onMouseUp = () => setIsResizing(false);
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isResizing]);
 
   return (
     <div
       className="grid h-screen min-h-screen overflow-hidden bg-slate-950 text-slate-100"
-      style={{
-        gridTemplateColumns: selectedArtifactId === null
-          ? "340px minmax(0, 1fr)"
-          : "340px minmax(0, 1fr) 420px"
-      }}
+      style={{ gridTemplateColumns: `320px minmax(0, 1fr) 6px ${chatWidth}px` }}
     >
       <Sidebar selectedArtifactId={selectedArtifactId} onSelectArtifact={setSelectedArtifactId} />
-      {selectedArtifactId !== null && <ArtifactWorkspace artifactId={selectedArtifactId} />}
+      <ArtifactWorkspace artifactId={selectedArtifactId} />
+      <button
+        aria-label="Resize chat panel"
+        className="h-full w-full cursor-col-resize border-slate-800 border-x bg-slate-950 hover:bg-sky-900"
+        type="button"
+        onMouseDown={() => setIsResizing(true)}
+      />
       <Chat />
     </div>
   );
