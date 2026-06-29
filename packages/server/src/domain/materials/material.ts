@@ -33,6 +33,16 @@ export class MaterialRepositoryError extends Data.TaggedError("MaterialRepositor
   readonly reason: unknown;
 }> {}
 
+export class InvalidMaterialUpload extends Data.TaggedError("InvalidMaterialUpload")<{
+  readonly fileName: string;
+  readonly reason: string;
+}> {}
+
+export interface UploadMaterialInput {
+  readonly fileName: string;
+  readonly sourcePath: string;
+}
+
 export interface MaterialRepository {
   readonly list: () => Effect.Effect<readonly PdfMaterial[], MaterialRepositoryError>;
   readonly get: (id: string) => Effect.Effect<PdfMaterial, MaterialNotFound | MaterialRepositoryError>;
@@ -40,6 +50,9 @@ export interface MaterialRepository {
     id: string,
     pages: readonly number[]
   ) => Effect.Effect<MaterialPageImages, MaterialNotFound | MaterialRepositoryError>;
+  readonly upload: (
+    input: UploadMaterialInput
+  ) => Effect.Effect<PdfMaterial, InvalidMaterialUpload | MaterialNotFound | MaterialRepositoryError>;
 }
 
 export const MaterialRepository = Context.Service<MaterialRepository>(

@@ -1,11 +1,13 @@
 import { Effect, FileSystem, Layer, Option, Path } from "effect";
 import {
+  InvalidMaterialUpload,
   MaterialNotFound,
   MaterialRepository,
   MaterialRepositoryError,
   type MaterialPageImages,
   type MaterialRepository as MaterialRepositoryType,
-  type PdfMaterial
+  type PdfMaterial,
+  type UploadMaterialInput
 } from "../../domain/materials/material.ts";
 import { PdfService } from "../../domain/materials/pdf-service.ts";
 
@@ -92,7 +94,22 @@ export const FileMaterialRepository = {
       };
     });
 
-    return { list, get, renderPages };
+    const upload = (input: UploadMaterialInput) => Effect.gen(function* () {
+      if (path.extname(input.fileName).toLowerCase() !== ".pdf") {
+        return yield* new InvalidMaterialUpload({
+          fileName: input.fileName,
+          reason: "Only .pdf files are supported"
+        });
+      }
+
+      const safeName = path.basename(input.fileName);
+      yield* fs.makeDirectory(directory, { recursive: true }).pipe(Effect.mapError(mapError));
+      yield* fs.copyFile(input.sourcePath, pdfPath(safeName)).pipe(Effect.mapError(mapError));
+
+      return yield* get(path.basename(safeName, ".pdf"));
+    });
+
+    return { list, get, renderPages, upload };
   }),
   layer: (directory: string) => Layer.effect(MaterialRepository)(FileMaterialRepository.make(directory))
 };

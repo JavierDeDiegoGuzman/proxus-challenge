@@ -1,6 +1,13 @@
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import { Multipart } from "effect/unstable/http";
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { MaterialListResponse, PdfMaterial } from "../schemas/material.ts";
+
+export const UploadMaterialPayload = HttpApiSchema.asMultipart()(
+  Schema.Struct({
+    file: Multipart.SingleFileSchema
+  })
+);
 
 export class MaterialsApi extends HttpApiGroup.make("materials")
   .add(
@@ -11,6 +18,10 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
       params: {
         id: Schema.String
       },
+      success: PdfMaterial
+    }),
+    HttpApiEndpoint.post("upload", "/", {
+      payload: UploadMaterialPayload,
       success: PdfMaterial
     })
   )

@@ -28,7 +28,11 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
         Effect.map((items) => ({ materials: items })),
         Effect.orDie
       ))
-      .handle("get", ({ params }) => materials.get(params.id).pipe(Effect.orDie));
+      .handle("get", ({ params }) => materials.get(params.id).pipe(Effect.orDie))
+      .handle("upload", ({ payload }) => materials.upload({
+        fileName: payload.file.name,
+        sourcePath: payload.file.path
+      }).pipe(Effect.orDie));
   })
 );
 

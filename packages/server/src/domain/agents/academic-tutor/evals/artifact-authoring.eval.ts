@@ -19,6 +19,7 @@ import {
 import {
   MaterialNotFound,
   MaterialRepository,
+  MaterialRepositoryError,
   type MaterialPageImages,
   type PdfMaterial
 } from "../../../materials/material.ts";
@@ -274,7 +275,8 @@ const makeMaterialRepository = (materials: readonly MaterialFixture[]) => Materi
       material: toPdfMaterial(material),
       pages: renderedPages
     });
-  }
+  },
+  upload: () => Effect.fail(new MaterialRepositoryError({ reason: "upload not supported in eval fixtures" }))
 });
 
 const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
