@@ -9,6 +9,12 @@ export const UploadMaterialPayload = HttpApiSchema.asMultipart()(
   })
 );
 
+export const UploadMaterialResponse = Schema.Struct({
+  material: PdfMaterial,
+  tutorNote: Schema.String
+});
+export type UploadMaterialResponse = typeof UploadMaterialResponse.Type;
+
 export class MaterialsApi extends HttpApiGroup.make("materials")
   .add(
     HttpApiEndpoint.get("list", "/", {
@@ -22,7 +28,7 @@ export class MaterialsApi extends HttpApiGroup.make("materials")
     }),
     HttpApiEndpoint.post("upload", "/", {
       payload: UploadMaterialPayload,
-      success: PdfMaterial
+      success: UploadMaterialResponse
     })
   )
   .prefix("/materials")

@@ -2,6 +2,7 @@ import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { ProxusApi } from "@proxus/shared";
 import { TutorChatService } from "../../domain/agents/academic-tutor/tutor-chat-service.ts";
+import { runMaterialUploadPipeline, runQuizReviewPipeline } from "../../domain/agents/academic-tutor/pipelines.ts";
 import { ArtifactRepository, type Artifact } from "../../domain/artifacts/artifact.ts";
 import { MaterialRepository } from "../../domain/materials/material.ts";
 
@@ -22,6 +23,7 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
   "materials",
   Effect.fn(function* (handlers) {
     const materials = yield* MaterialRepository;
+    const artifacts = yield* ArtifactRepository;
 
     return handlers
       .handle("list", () => materials.list().pipe(
@@ -32,7 +34,12 @@ export const MaterialsHttpHandlers = HttpApiBuilder.group(
       .handle("upload", ({ payload }) => materials.upload({
         fileName: payload.file.name,
         sourcePath: payload.file.path
-      }).pipe(Effect.orDie));
+      }).pipe(
+        Effect.orDie,
+        Effect.flatMap((material) => runMaterialUploadPipeline(materials, artifacts, material.id).pipe(
+          Effect.map((tutorNote) => ({ material, tutorNote }))
+        ))
+      ));
   })
 );
 
@@ -47,6 +54,7 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
   "artifacts",
   Effect.fn(function* (handlers) {
     const artifacts = yield* ArtifactRepository;
+    const materials = yield* MaterialRepository;
 
     return handlers
       .handle("list", ({ query }) => artifacts.listArtifacts({ kind: query.kind }).pipe(
@@ -59,7 +67,10 @@ export const ArtifactsHttpHandlers = HttpApiBuilder.group(
         artifactId: params.id
       }).pipe(
         Effect.flatMap((attempt) => artifacts.gradeAttempt(attempt.id)),
-        Effect.orDie
+        Effect.orDie,
+        Effect.flatMap((attempt) => runQuizReviewPipeline(materials, artifacts, attempt.id).pipe(
+          Effect.map((tutorNote) => ({ attempt, tutorNote }))
+        ))
       ));
   })
 );

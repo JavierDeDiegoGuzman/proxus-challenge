@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { Streamdown } from "streamdown";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { artifactQuery, submitArtifactAttemptAction } from "../domain/artifacts/atoms.ts";
+import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
 
 type Answers = Record<string, string>;
 
@@ -84,6 +85,7 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitAttempt = useAtomSet(submitArtifactAttemptAction, { mode: "promise" });
+  const appendTutorMessage = useAtomSet(tutorMessagesAtom);
 
   const unansweredQuestions = useMemo(
     () => artifact.questions.filter((question) => (answers[question.id] ?? "").trim().length === 0),
@@ -105,7 +107,8 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
     try {
       const payload = buildSubmitInput(artifact, answers);
       const result = await submitAttempt(payload);
-      setAttempt(result);
+      setAttempt(result.attempt);
+      appendTutorMessage((current) => [...current, { role: "assistant", content: result.tutorNote }]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {

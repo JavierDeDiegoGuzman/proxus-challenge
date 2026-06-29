@@ -10,6 +10,12 @@ const ArtifactKindQuery = Schema.Struct({
   ]))
 });
 
+export const SubmitAttemptResponse = Schema.Struct({
+  attempt: ArtifactAttempt,
+  tutorNote: Schema.String
+});
+export type SubmitAttemptResponse = typeof SubmitAttemptResponse.Type;
+
 export class ArtifactsApi extends HttpApiGroup.make("artifacts")
   .add(
     HttpApiEndpoint.get("list", "/", {
@@ -27,7 +33,7 @@ export class ArtifactsApi extends HttpApiGroup.make("artifacts")
         id: Schema.String
       },
       payload: SubmitAttemptInput,
-      success: ArtifactAttempt
+      success: SubmitAttemptResponse
     })
   )
   .prefix("/artifacts")

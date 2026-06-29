@@ -1,12 +1,13 @@
-import { useAtomRefresh } from "@effect/atom-react";
+import { useAtom, useAtomRefresh } from "@effect/atom-react";
 import type { AgentMessage } from "@proxus/shared";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import { artifactsQuery } from "../domain/artifacts/atoms.ts";
 import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
+import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
 
 const starterPrompts = [
   "List my uploaded materials",
@@ -15,13 +16,18 @@ const starterPrompts = [
 ] as const;
 
 export function Chat() {
-  const [messages, setMessages] = useState<readonly AgentMessage[]>([]);
+  const [messages, setMessages] = useAtom(tutorMessagesAtom);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const refreshArtifacts = useAtomRefresh(artifactsQuery);
   const refreshMaterials = useAtomRefresh(materialsQuery);
   const pendingInvalidations = useRef<Array<ReturnType<typeof invalidationsForToolCall>>>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const submit = async (nextInput: string) => {
     const trimmed = nextInput.trim();
@@ -109,6 +115,7 @@ export function Chat() {
               </div>
             )
           : messages.map((message, index) => <MessageBubble key={index} message={message} />)}
+        <div ref={bottomRef} />
       </section>
 
       {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-200">{error}</p>}
