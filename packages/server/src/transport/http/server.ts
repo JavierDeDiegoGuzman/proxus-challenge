@@ -125,13 +125,86 @@ const QualityScoresRoute = HttpRouter.add("GET", "/quality/scores", () =>
   })
 );
 
+const JUDGE_PROMPT = (input: string, output: string) => `
+You are evaluating an AI academic tutor. Score it on three dimensions based on this exchange.
+Reply with ONLY a valid JSON object, no other text.
+
+Student input: """${input}"""
+Tutor response: """${output}"""
+
+Score each from 1 to 5:
+- accuracy: Is the information factually correct and not fabricated?
+- helpfulness: Does the response address the student's actual need?
+- groundedness: Is the response grounded in real content, not invented?
+
+Reply with exactly: {"accuracy":<1-5>,"helpfulness":<1-5>,"groundedness":<1-5>,"reasoning":"<one sentence>"}
+`.trim();
+
+const RunJudgeRoute = HttpRouter.add("POST", "/quality/run-judge", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const lm = yield* LanguageModel.LanguageModel;
+
+    const entries = yield* fs.readDirectory(LOGS_DIR).pipe(
+      Effect.orElseSucceed(() => [] as string[])
+    );
+
+    const files = entries.filter((f) => f.endsWith(".json")).sort().reverse().slice(0, 10);
+
+    const perTrace: Array<{ timestamp: string; input: string; scores: { accuracy: number; helpfulness: number; groundedness: number; reasoning: string } }> = [];
+
+    for (const file of files) {
+      const raw = yield* fs.readFileString(`${LOGS_DIR}/${file}`).pipe(Effect.orElseSucceed(() => "null"));
+      const trace = JSON.parse(raw) as { timestamp: string; input: string; messages: Array<{ role: string; content?: string }> } | null;
+      if (!trace) continue;
+
+      const finalMsg = [...trace.messages].reverse().find((m) => m.role === "assistant");
+      const output = finalMsg?.content ?? "";
+      if (!output) continue;
+
+      const response = yield* LanguageModel.generateText({
+        prompt: JUDGE_PROMPT(trace.input, output)
+      }).pipe(
+        Effect.provideService(LanguageModel.LanguageModel, lm),
+        Effect.orElseSucceed(() => ({ text: '{"accuracy":3,"helpfulness":3,"groundedness":3,"reasoning":"Judge unavailable."}' }))
+      );
+
+      const defaultScores = { accuracy: 3, helpfulness: 3, groundedness: 3, reasoning: "Parse error." };
+      const scores: typeof defaultScores = yield* Effect.try({
+        try: () => JSON.parse(response.text.replace(/```json|```/g, "").trim()) as typeof defaultScores,
+        catch: () => defaultScores
+      }).pipe(Effect.orElseSucceed(() => defaultScores));
+
+      perTrace.push({ timestamp: trace.timestamp, input: trace.input.slice(0, 120), scores });
+    }
+
+    const avg = (key: "accuracy" | "helpfulness" | "groundedness") => {
+      const vals = perTrace.filter((t) => t.scores[key] > 0);
+      return vals.length === 0 ? 0 : Math.round(vals.reduce((s, t) => s + t.scores[key], 0) / vals.length * 10) / 10;
+    };
+
+    const report = {
+      scoredAt: new Date().toISOString(),
+      tracesEvaluated: perTrace.length,
+      scores: { accuracy: avg("accuracy"), helpfulness: avg("helpfulness"), groundedness: avg("groundedness") },
+      perTrace
+    };
+
+    yield* fs.makeDirectory(".data/evals", { recursive: true }).pipe(Effect.ignore);
+    yield* fs.writeFileString(SCORES_PATH, JSON.stringify(report, null, 2)).pipe(Effect.ignore);
+
+    return HttpServerResponse.text(JSON.stringify(report), { contentType: "application/json" });
+  })
+);
+
 const Routes = Layer.mergeAll(
   ApiRoutes,
   DocsRoute,
   TutorStreamRoute,
   QualityPageRoute,
   QualityTracesRoute,
-  QualityScoresRoute
+  QualityScoresRoute,
+  RunJudgeRoute
 );
 
 const DomainLive = Layer.mergeAll(
