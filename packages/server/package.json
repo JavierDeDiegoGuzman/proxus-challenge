@@ -12,6 +12,7 @@
     "eval:tutor:artifact-authoring": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/artifact-authoring.eval.ts",
     "eval:tutor:quality": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/tutor-quality.eval.ts",
     "eval:report": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/run-quality-report.ts",
+    "eval:judge": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/judge-traces.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
