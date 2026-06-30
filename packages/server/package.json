@@ -10,6 +10,8 @@
     "agent:tutor": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor.ts",
     "dev": "node --env-file=../../.env --import tsx src/index.ts",
     "eval:tutor:artifact-authoring": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/artifact-authoring.eval.ts",
+    "eval:tutor:quality": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/tutor-quality.eval.ts",
+    "eval:report": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/run-quality-report.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

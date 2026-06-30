@@ -1,4 +1,5 @@
 import { Effect, Layer, Schema, Stream } from "effect";
+import { FileSystem } from "effect";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { createServer } from "node:http";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
@@ -11,6 +12,7 @@ import { FileArtifactRepository } from "../../infra/artifacts/file-artifact-repo
 import { FileMaterialRepository } from "../../infra/materials/file-material-repository.ts";
 import { PopplerPdfService } from "../../infra/materials/poppler-pdf-service.ts";
 import { HttpHandlersLive } from "./handlers.ts";
+import { qualityDashboardHtml } from "./quality-page.ts";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
@@ -47,7 +49,21 @@ const TutorStreamRoute = HttpRouter.add("POST", "/api/tutor/chat/stream", () =>
   })
 );
 
-const Routes = Layer.mergeAll(ApiRoutes, DocsRoute, TutorStreamRoute);
+const QualityDataRoute = HttpRouter.add("GET", "/quality/data", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const json = yield* fs.readFileString(".data/evals/latest.json").pipe(
+      Effect.orElseSucceed(() => JSON.stringify({ error: "No report yet. Run: pnpm --filter @proxus/server run eval:report" }))
+    );
+    return HttpServerResponse.text(json, { contentType: "application/json" });
+  })
+);
+
+const QualityPageRoute = HttpRouter.add("GET", "/quality", () =>
+  Effect.succeed(HttpServerResponse.text(qualityDashboardHtml, { contentType: "text/html" }))
+);
+
+const Routes = Layer.mergeAll(ApiRoutes, DocsRoute, TutorStreamRoute, QualityDataRoute, QualityPageRoute);
 
 const DomainLive = Layer.mergeAll(
   TutorChatServiceLive,

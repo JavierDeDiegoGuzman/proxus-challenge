@@ -1,31 +1,21 @@
-import { Console, Context, Data, Effect, Layer, Ref, Schema } from "effect";
+import { Console, Data, Effect, Layer, Ref, Schema } from "effect";
 import { GeminiModel } from "../../gemini.ts";
 import { AgentSession } from "../../harness/index.ts";
 import { type AgentMessage } from "../../harness/message.ts";
 import { makeAcademicTutorHarness } from "../../academic-tutor.ts";
+import { ArtifactRepository } from "../../../artifacts/artifact.ts";
+import { MaterialRepository } from "../../../materials/material.ts";
 import {
-  Artifact,
-  ArtifactAttempt,
-  ArtifactNotFound,
-  ArtifactRepository,
-  ArtifactTypeMismatch,
-  AttemptNotFound,
-  type ArtifactRepositoryError,
-  type CreateArtifactInput,
-  type ListArtifactsInput,
-  type SubmitAttemptInput,
-  gradeAttempt
-} from "../../../artifacts/artifact.ts";
-import {
-  MaterialNotFound,
-  MaterialRepository,
-  MaterialRepositoryError,
-  type MaterialPageImages,
-  type PdfMaterial
-} from "../../../materials/material.ts";
-
-const EvalId = Schema.String;
-const EvalCaseId = Schema.String;
+  ArtifactRepositoryTestRef,
+  EvalCaseId,
+  EvalCaseReport,
+  InMemoryArtifactRepository,
+  MaterialFixture,
+  formatReport,
+  failed,
+  makeMaterialRepository,
+  passed
+} from "./eval-support.ts";
 
 const ArtifactKind = Schema.Union([
   Schema.Literal("note"),
@@ -33,31 +23,11 @@ const ArtifactKind = Schema.Union([
   Schema.Literal("test")
 ]);
 
-const CriterionStatus = Schema.Union([
-  Schema.Literal("passed"),
-  Schema.Literal("failed")
-]);
-
 const ArtifactAuthoringExpected = Schema.Struct({
   artifactKind: ArtifactKind,
   questionCount: Schema.optional(Schema.Number)
 });
 type ArtifactAuthoringExpected = typeof ArtifactAuthoringExpected.Type;
-
-const MaterialPageFixture = Schema.Struct({
-  page: Schema.Number,
-  text: Schema.String
-});
-type MaterialPageFixture = typeof MaterialPageFixture.Type;
-
-const MaterialFixture = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  fileName: Schema.String,
-  uploadedAt: Schema.String,
-  pages: Schema.Array(MaterialPageFixture)
-});
-type MaterialFixture = typeof MaterialFixture.Type;
 
 const ArtifactAuthoringEvalCase = Schema.Struct({
   id: EvalCaseId,
@@ -69,28 +39,11 @@ const ArtifactAuthoringEvalCase = Schema.Struct({
 type ArtifactAuthoringEvalCase = typeof ArtifactAuthoringEvalCase.Type;
 
 const ArtifactAuthoringEvalDataset = Schema.Struct({
-  id: EvalId,
+  id: Schema.String,
   description: Schema.String,
   cases: Schema.Array(ArtifactAuthoringEvalCase)
 });
 type ArtifactAuthoringEvalDataset = typeof ArtifactAuthoringEvalDataset.Type;
-
-const CriterionResult = Schema.Struct({
-  id: Schema.String,
-  status: CriterionStatus,
-  message: Schema.String,
-  details: Schema.optional(Schema.Unknown)
-});
-type CriterionResult = typeof CriterionResult.Type;
-
-const EvalCaseReport = Schema.Struct({
-  evalId: Schema.String,
-  caseId: Schema.String,
-  status: CriterionStatus,
-  output: Schema.String,
-  criteria: Schema.Array(CriterionResult)
-});
-type EvalCaseReport = typeof EvalCaseReport.Type;
 
 type EvalCaseContext = {
   readonly dataset: ArtifactAuthoringEvalDataset;
@@ -101,194 +54,11 @@ type EvalCaseContext = {
 
 type AcceptanceCriterion = {
   readonly id: string;
-  readonly evaluate: (context: EvalCaseContext) => Effect.Effect<CriterionResult, never, ArtifactRepositoryTestRef>;
+  readonly evaluate: (context: EvalCaseContext) => Effect.Effect<ReturnType<typeof passed>, never, ArtifactRepositoryTestRef>;
 };
 
-interface ArtifactRepositoryState {
-  readonly artifacts: readonly Artifact[];
-  readonly attempts: readonly ArtifactAttempt[];
-  readonly nextArtifactId: number;
-  readonly nextAttemptId: number;
-}
-
-class ArtifactRepositoryTestRef extends Context.Service<ArtifactRepositoryTestRef, Ref.Ref<ArtifactRepositoryState>>()(
-  "@proxus/server/evals/ArtifactRepositoryTestRef"
-) {
-  static readonly layer = Layer.effect(
-    ArtifactRepositoryTestRef,
-    Ref.make<ArtifactRepositoryState>({
-      artifacts: [],
-      attempts: [],
-      nextArtifactId: 1,
-      nextAttemptId: 1
-    })
-  );
-}
-
-const InMemoryArtifactRepository = Layer.effect(
-  ArtifactRepository,
-  Effect.gen(function* () {
-    const ref = yield* ArtifactRepositoryTestRef;
-
-    const createArtifact = (input: CreateArtifactInput): Effect.Effect<Artifact, ArtifactRepositoryError> =>
-      Ref.modify(ref, (state) => {
-        const artifact = {
-          ...input,
-          id: `artifact-${state.nextArtifactId}`
-        } as Artifact;
-
-        return [
-          artifact,
-          {
-            ...state,
-            artifacts: [...state.artifacts, artifact],
-            nextArtifactId: state.nextArtifactId + 1
-          }
-        ];
-      });
-
-    const saveArtifact = (artifact: Artifact): Effect.Effect<void, ArtifactRepositoryError> =>
-      Ref.update(ref, (state) => ({
-        ...state,
-        artifacts: [...state.artifacts.filter((candidate) => candidate.id !== artifact.id), artifact]
-      }));
-
-    const getArtifact = (id: string): Effect.Effect<Artifact, ArtifactRepositoryError> =>
-      Ref.get(ref).pipe(
-        Effect.andThen((state) => {
-          const artifact = state.artifacts.find((candidate) => candidate.id === id);
-          return artifact === undefined
-            ? Effect.fail(new ArtifactNotFound({ artifactId: id }))
-            : Effect.succeed(artifact);
-        })
-      );
-
-    const listArtifacts = (input?: ListArtifactsInput): Effect.Effect<readonly Artifact[], ArtifactRepositoryError> =>
-      Ref.get(ref).pipe(
-        Effect.map((state) => input?.kind === undefined
-          ? state.artifacts
-          : state.artifacts.filter((artifact) => artifact.kind === input.kind)
-        )
-      );
-
-    const submitAttempt = (input: SubmitAttemptInput): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
-      getArtifact(input.artifactId).pipe(
-        Effect.andThen((artifact) => {
-          if (artifact.kind !== input.artifactKind) {
-            return Effect.fail(new ArtifactTypeMismatch({
-              artifactId: artifact.id,
-              expected: input.artifactKind,
-              actual: artifact.kind
-            }));
-          }
-
-          return Ref.modify(ref, (state) => {
-            const attempt = {
-              ...input,
-              id: `attempt-${state.nextAttemptId}`,
-              status: "ungraded" as const
-            } as ArtifactAttempt;
-
-            return [
-              attempt,
-              {
-                ...state,
-                attempts: [...state.attempts, attempt],
-                nextAttemptId: state.nextAttemptId + 1
-              }
-            ];
-          });
-        })
-      );
-
-    const saveAttempt = (attempt: ArtifactAttempt): Effect.Effect<void, ArtifactRepositoryError> =>
-      Ref.update(ref, (state) => ({
-        ...state,
-        attempts: [...state.attempts.filter((candidate) => candidate.id !== attempt.id), attempt]
-      }));
-
-    const getAttempt = (id: string): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
-      Ref.get(ref).pipe(
-        Effect.andThen((state) => {
-          const attempt = state.attempts.find((candidate) => candidate.id === id);
-          return attempt === undefined
-            ? Effect.fail(new AttemptNotFound({ attemptId: id }))
-            : Effect.succeed(attempt);
-        })
-      );
-
-    const listAttempts = (artifactId?: string): Effect.Effect<readonly ArtifactAttempt[], ArtifactRepositoryError> =>
-      Ref.get(ref).pipe(
-        Effect.map((state) => artifactId === undefined
-          ? state.attempts
-          : state.attempts.filter((attempt) => attempt.artifactId === artifactId)
-        )
-      );
-
-    const gradeSavedAttempt = (attemptId: string): Effect.Effect<ArtifactAttempt, ArtifactRepositoryError> =>
-      getAttempt(attemptId).pipe(
-        Effect.andThen((attempt) => getArtifact(attempt.artifactId).pipe(
-          Effect.andThen((artifact) => gradeAttempt(artifact, attempt)),
-          Effect.andThen((gradedAttempt) => saveAttempt(gradedAttempt).pipe(Effect.as(gradedAttempt)))
-        ))
-      );
-
-    return ArtifactRepository.of({
-      createArtifact,
-      saveArtifact,
-      getArtifact,
-      listArtifacts,
-      submitAttempt,
-      saveAttempt,
-      getAttempt,
-      listAttempts,
-      gradeAttempt: gradeSavedAttempt
-    });
-  })
-).pipe(Layer.provideMerge(ArtifactRepositoryTestRef.layer));
-
-const makeMaterialRepository = (materials: readonly MaterialFixture[]) => MaterialRepository.of({
-  list: () => Effect.succeed(materials.map(toPdfMaterial)),
-  get: (id) => {
-    const material = materials.find((candidate) => candidate.id === id);
-    return material === undefined
-      ? Effect.fail(new MaterialNotFound({ materialId: id }))
-      : Effect.succeed(toPdfMaterial(material));
-  },
-  renderPages: (id, pages) => {
-    const material = materials.find((candidate) => candidate.id === id);
-    if (material === undefined) {
-      return Effect.fail(new MaterialNotFound({ materialId: id }));
-    }
-
-    const renderedPages = pages.map((page) => {
-      const fixturePage = material.pages.find((candidate) => candidate.page === page);
-      return {
-        page,
-        mediaType: "image/png" as const,
-        data: `data:image/png;base64,${btoa(fixturePage?.text ?? `Page ${page}`)}`
-      };
-    });
-
-    return Effect.succeed<MaterialPageImages>({
-      type: "material-page-images",
-      material: toPdfMaterial(material),
-      pages: renderedPages
-    });
-  },
-  upload: () => Effect.fail(new MaterialRepositoryError({ reason: "upload not supported in eval fixtures" }))
-});
-
-const toPdfMaterial = (material: MaterialFixture): PdfMaterial => ({
-  id: material.id,
-  title: material.title,
-  fileName: material.fileName,
-  pageCount: material.pages.length,
-  uploadedAt: material.uploadedAt
-});
-
 const makeEvalLayer = (testCase: ArtifactAuthoringEvalCase) => Layer.mergeAll(
-  InMemoryArtifactRepository,
+  InMemoryArtifactRepository.pipe(Layer.provideMerge(ArtifactRepositoryTestRef.layer)),
   Layer.succeed(MaterialRepository, makeMaterialRepository(testCase.materials ?? [])),
   GeminiModel
 );
@@ -359,12 +129,6 @@ const shouldNotHaveToolFailures = (): AcceptanceCriterion => ({
   }
 });
 
-const passed = (id: string, message: string, details?: unknown): CriterionResult =>
-  CriterionResult.make({ id, status: "passed", message, details });
-
-const failed = (id: string, message: string, details?: unknown): CriterionResult =>
-  CriterionResult.make({ id, status: "failed", message, details });
-
 const dataset = ArtifactAuthoringEvalDataset.make({
   id: "academic-tutor.artifact-authoring",
   description: "The tutor creates valid note, quiz, and test artifacts when the user asks for academic practice material.",
@@ -431,7 +195,7 @@ const runEvalCase = (
   });
 });
 
-const runDataset = (evalDataset: ArtifactAuthoringEvalDataset) => Effect.gen(function* () {
+export const runArtifactAuthoringDataset = (evalDataset: ArtifactAuthoringEvalDataset = dataset) => Effect.gen(function* () {
   const reports: EvalCaseReport[] = [];
 
   for (const testCase of evalDataset.cases) {
@@ -444,26 +208,10 @@ const runDataset = (evalDataset: ArtifactAuthoringEvalDataset) => Effect.gen(fun
   return reports;
 });
 
-const formatReport = (reports: readonly EvalCaseReport[]) => {
-  const lines: string[] = [dataset.id];
-
-  for (const report of reports) {
-    lines.push(`  ${report.status === "passed" ? "✓" : "✗"} ${report.caseId}`);
-    for (const criterion of report.criteria) {
-      lines.push(`    ${criterion.status === "passed" ? "✓" : "✗"} ${criterion.id}: ${criterion.message}`);
-      if (criterion.status === "failed" && criterion.details !== undefined) {
-        lines.push(`      ${JSON.stringify(criterion.details, null, 2).split("\n").join("\n      ")}`);
-      }
-    }
-  }
-
-  return lines.join("\n");
-};
-
 class ArtifactAuthoringEvalFailed extends Data.TaggedError("ArtifactAuthoringEvalFailed")<{}> {}
 
-export const artifactAuthoringEval = runDataset(dataset).pipe(
-  Effect.tap((reports) => Console.log(formatReport(reports))),
+export const artifactAuthoringEval = runArtifactAuthoringDataset().pipe(
+  Effect.tap((reports) => Console.log(formatReport(dataset.id, reports))),
   Effect.andThen((reports) => reports.some((report) => report.status === "failed")
     ? Effect.fail(new ArtifactAuthoringEvalFailed())
     : Effect.succeed(reports)
