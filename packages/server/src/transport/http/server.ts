@@ -16,7 +16,6 @@ import { qualityDashboardHtml } from "./quality-page.ts";
 
 const LOGS_DIR = ".data/logs";
 const SCORES_PATH = ".data/evals/scored.json";
-const EVALS_PATH = ".data/evals/latest.json";
 
 const ApiRoutes = HttpApiBuilder.layer(ProxusApi, {
   openapiPath: "/openapi.json"
@@ -117,10 +116,7 @@ const QualityScoresRoute = HttpRouter.add("GET", "/quality/scores", () =>
     const scored = yield* fs.readFileString(SCORES_PATH).pipe(
       Effect.orElseSucceed(() => "null")
     );
-    const evals = yield* fs.readFileString(EVALS_PATH).pipe(
-      Effect.orElseSucceed(() => "null")
-    );
-    const json = JSON.stringify({ scored: JSON.parse(scored), evals: JSON.parse(evals) });
+    const json = JSON.stringify({ scored: JSON.parse(scored) });
     return HttpServerResponse.text(json, { contentType: "application/json" });
   })
 );
