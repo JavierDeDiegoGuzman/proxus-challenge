@@ -32,6 +32,8 @@ export const artifactQuery = Atom.family((id: string) =>
     .pipe(Atom.keepAlive, Atom.withReactivity({ artifacts: [id] }))
 );
 
+export const selectedArtifactIdAtom = Atom.make<string | null>(null).pipe(Atom.keepAlive);
+
 export const submitArtifactAttemptAction = apiRuntime.fn(
   (input: SubmitAttemptInput) =>
     ApiClient.use((client) => input.artifactKind === "quiz"

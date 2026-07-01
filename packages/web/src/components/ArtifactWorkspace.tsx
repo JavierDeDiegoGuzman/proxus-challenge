@@ -136,6 +136,24 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
       const result = await submitAttempt(payload);
       setAttempt(result.attempt);
       appendTutorMessage((current) => [...current, { role: "assistant", content: result.tutorNote }]);
+
+      if (result.attempt.status === "graded") {
+        const a = result.attempt;
+        const wrongCount = a.corrections.filter((c) =>
+          "correct" in c ? !c.correct : c.score < c.maxScore
+        ).length;
+        const cardData = JSON.stringify({
+          score: a.score,
+          maxScore: a.maxScore,
+          wrongCount,
+          artifactId: artifact.id,
+          artifactTitle: artifact.title
+        });
+        appendTutorMessage((current) => [
+          ...current,
+          { role: "assistant", content: `%%SCORE_CARD: ${cardData}%%` }
+        ]);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -319,11 +337,19 @@ function TrueFalseInput({
   );
 }
 
+function scoreColor(score: number, maxScore: number) {
+  const pct = maxScore > 0 ? score / maxScore : 0;
+  if (pct >= 0.6) return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", sub: "text-emerald-700/80" };
+  if (pct >= 0.3) return { border: "border-orange-200", bg: "bg-orange-50", text: "text-orange-700", sub: "text-orange-700/80" };
+  return { border: "border-red-200", bg: "bg-red-50", text: "text-red-700", sub: "text-red-700/80" };
+}
+
 function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt, { readonly status: "graded" }> }) {
+  const c = scoreColor(attempt.score, attempt.maxScore);
   return (
-    <section className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-      <p className="font-bold text-emerald-700 text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
-      <p className="mt-1 text-emerald-700/80">{attempt.summary}</p>
+    <section className={`mt-6 rounded-3xl border ${c.border} ${c.bg} p-5`}>
+      <p className={`font-bold text-xl ${c.text}`}>Score: {attempt.score} / {attempt.maxScore}</p>
+      <p className={`mt-1 ${c.sub}`}>{attempt.summary}</p>
     </section>
   );
 }

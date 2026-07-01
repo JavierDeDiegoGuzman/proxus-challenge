@@ -1,13 +1,15 @@
+import { useAtom } from "@effect/atom-react";
 import { useEffect, useState } from "react";
 import { ArtifactWorkspace } from "./components/ArtifactWorkspace.tsx";
 import { Chat } from "./components/Chat.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { selectedArtifactIdAtom } from "./domain/artifacts/atoms.ts";
 
 const MIN_CHAT_WIDTH = 320;
 const MAX_CHAT_WIDTH = 720;
 
 export function App() {
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [selectedArtifactId, setSelectedArtifactId] = useAtom(selectedArtifactIdAtom);
   const [chatWidth, setChatWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -43,7 +45,7 @@ export function App() {
         type="button"
         onMouseDown={() => setIsResizing(true)}
       />
-      <Chat />
+      <Chat onSelectArtifact={setSelectedArtifactId} />
     </div>
   );
 }

@@ -206,7 +206,8 @@ const requestBody = (options: LanguageModel.ProviderOptions) => ({
   systemInstruction: promptSystemInstruction(options.prompt),
   contents: promptContents(options.prompt),
   tools: geminiTools(options.tools),
-  toolConfig: toolConfig(options)
+  toolConfig: toolConfig(options),
+  generationConfig: { maxOutputTokens: 16384 }
 });
 
 const firstFunctionCall = (parts: ReadonlyArray<GeminiPart>) =>

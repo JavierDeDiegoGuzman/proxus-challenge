@@ -43,8 +43,9 @@ export const CreateStudyArtifactsSkill = AgentSkill.make({
     "1. For artifacts based on uploaded materials, inspect the uploaded material first.",
     "2. Create a compact artifact that directly matches the user's request.",
     "3. Use stable question ids like `q1`, `q2`, `q3`.",
-    "4. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
-    "5. When a user submits answers, save the attempt and then grade it.",
-    "6. When the user asks to see quiz/test results later (e.g. \"show me my quiz results\"), use `artifacts attempts` to find the attempt id, then `artifacts attempt <attemptId>` to read score and corrections. Do not say results are missing without checking this first."
+    "4. ALWAYS limit quizzes and tests to a maximum of 5 questions. Never generate more than 5 questions in a single artifact — keep the JSON small to avoid truncation errors.",
+    "5. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
+    "6. When a user submits answers, save the attempt and then grade it.",
+    "7. When the user asks to see quiz/test results later (e.g. \"show me my quiz results\"), use `artifacts attempts` to find the attempt id, then `artifacts attempt <attemptId>` to read score and corrections. Do not say results are missing without checking this first."
   ].join("\n")
 });
