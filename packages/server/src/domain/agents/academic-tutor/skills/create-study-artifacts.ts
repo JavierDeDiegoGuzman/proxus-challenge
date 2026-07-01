@@ -18,13 +18,19 @@ export const CreateStudyArtifactsSkill = AgentSkill.make({
     "- `artifacts show <artifactId>`: show an artifact JSON.",
     "- `artifacts create '<json>'`: create a note, quiz, or test from CreateArtifactInput JSON. Always wrap JSON in single quotes.",
     "- `artifacts submit '<json>'`: submit answers for a quiz or test from SubmitAttemptInput JSON. Always wrap JSON in single quotes.",
-    "- `artifacts attempts [artifactId]`: list attempts.",
+    "- `artifacts attempts [artifactId]`: list attempts (summary only, no score).",
+    "- `artifacts attempt <attemptId>`: show one attempt's full details, including score and corrections if already graded. Use this whenever the user asks about quiz/test results.",
     "- `artifacts grade <attemptId>`: grade and persist a submitted attempt.",
     "",
     "CreateArtifactInput examples:",
     "- `artifacts create '{\"kind\":\"note\",\"title\":\"Derivatives summary\",\"markdown\":\"# Derivatives\\n...\"}'`",
     "- `artifacts create '{\"kind\":\"quiz\",\"title\":\"Basics quiz\",\"questions\":[{\"type\":\"true-false\",\"id\":\"q1\",\"prompt\":\"2+2=4\",\"correctAnswer\":true,\"explanation\":\"Basic arithmetic.\"}]}'`",
     "- `artifacts create '{\"kind\":\"quiz\",\"title\":\"Concept quiz\",\"questions\":[{\"type\":\"multiple-choice\",\"id\":\"q1\",\"prompt\":\"Which option is qualitative?\",\"options\":[{\"id\":\"qualitative\",\"text\":\"Qualitative\"},{\"id\":\"quantitative\",\"text\":\"Quantitative\"}],\"correctOptionId\":\"qualitative\",\"explanation\":\"Qualitative data describes qualities.\"}]}'`",
+    "- `artifacts create '{\"kind\":\"test\",\"title\":\"Logic test\",\"questions\":[{\"type\":\"short-answer\",\"id\":\"q1\",\"prompt\":\"What is osmosis?\",\"expectedAnswer\":\"The movement of water across a semi-permeable membrane from a region of low solute concentration to high solute concentration.\",\"explanation\":\"Osmosis is the passive transport of water down its concentration gradient (Page 3).\"}]}'`",
+    "",
+    "Short-answer question rules:",
+    "- `expectedAnswer` is REQUIRED. It is the reference answer used for grading. Do NOT omit it.",
+    "- `explanation` is separate from `expectedAnswer`. It is the feedback shown after grading, not the answer itself.",
     "",
     "Multiple-choice question rules:",
     "- `options` must be objects, not strings: `{\"id\":\"a\",\"text\":\"Option text\"}`.",
@@ -37,7 +43,9 @@ export const CreateStudyArtifactsSkill = AgentSkill.make({
     "1. For artifacts based on uploaded materials, inspect the uploaded material first.",
     "2. Create a compact artifact that directly matches the user's request.",
     "3. Use stable question ids like `q1`, `q2`, `q3`.",
-    "4. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
-    "5. When a user submits answers, save the attempt and then grade it."
+    "4. ALWAYS limit quizzes and tests to a maximum of 5 questions. Never generate more than 5 questions in a single artifact — keep the JSON small to avoid truncation errors.",
+    "5. For quizzes, prefer true-false and multiple-choice because grading is deterministic.",
+    "6. When a user submits answers, save the attempt and then grade it.",
+    "7. When the user asks to see quiz/test results later (e.g. \"show me my quiz results\"), use `artifacts attempts` to find the attempt id, then `artifacts attempt <attemptId>` to read score and corrections. Do not say results are missing without checking this first."
   ].join("\n")
 });

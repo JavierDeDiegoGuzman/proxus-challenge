@@ -236,6 +236,34 @@ export const tokenize = (input: string): Effect.Effect<readonly string[], CliErr
     let index = 0;
 
     while (index < input.length) {
+      // Peek past whitespace: if the next token is a single-quoted JSON object ('{ ... }'),
+      // use brace-depth counting instead of the quote pattern so that apostrophes inside
+      // JSON string values (e.g. "it's", "don't") don't terminate the token early.
+      const wsLen = /^\s*/.exec(input.slice(index))?.[0].length ?? 0;
+      const peek = index + wsLen;
+      if (input[peek] === "'" && input[peek + 1] === "{") {
+        index = peek + 1; // skip whitespace + opening quote
+        const start = index;
+        let depth = 0;
+        let inStr = false;
+        let esc = false;
+        while (index < input.length) {
+          const ch = input[index]!;
+          if (esc) { esc = false; }
+          else if (ch === "\\" && inStr) { esc = true; }
+          else if (ch === '"') { inStr = !inStr; }
+          else if (!inStr && ch === "{") { depth++; }
+          else if (!inStr && ch === "}") {
+            if (--depth === 0) { index++; break; }
+          }
+          index++;
+        }
+        tokens.push(input.slice(start, index));
+        if (index < input.length && input[index] === "'") index++; // skip trailing quote
+        tokenPattern.lastIndex = index;
+        continue;
+      }
+
       tokenPattern.lastIndex = index;
       const match = tokenPattern.exec(input);
 
@@ -314,9 +342,8 @@ const parseParameters = <P extends Params>(parameters: P, tokens: readonly strin
   Effect.gen(function* () {
     const keys = Object.keys(parameters) as Array<keyof P>;
 
-    if (tokens.length > keys.length) {
-      return yield* new UnexpectedArgument({ value: tokens[keys.length] ?? "<unknown>" });
-    }
+    // Extra trailing tokens (e.g. model appending a stray word after the JSON argument)
+    // are silently ignored rather than failing — the command already has all it needs.
 
     const values: Partial<Record<keyof P, unknown>> = {};
     for (let index = 0; index < keys.length; index++) {

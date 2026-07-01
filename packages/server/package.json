@@ -9,7 +9,7 @@
     "agent:math": "node --env-file=../../.env --import tsx src/domain/agents/math.ts",
     "agent:tutor": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor.ts",
     "dev": "node --env-file=../../.env --import tsx src/index.ts",
-    "eval:tutor:artifact-authoring": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/artifact-authoring.eval.ts",
+    "eval:judge": "node --env-file=../../.env --import tsx src/domain/agents/academic-tutor/evals/judge-traces.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

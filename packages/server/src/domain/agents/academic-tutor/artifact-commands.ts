@@ -212,6 +212,21 @@ export const makeArtifactCommands = (repository: ArtifactRepository) => {
     )
   );
 
+  const attempt = AgentCli.Command.withExamples([
+    { command: "artifacts attempt attempt123", description: "Show full details of one attempt, including score and corrections when already graded" }
+  ])(
+    AgentCli.Command.withDescription("Show one attempt's full details. Use this to answer questions about quiz/test results, whether the attempt is ungraded or already graded")(
+      AgentCli.Command.exec("attempt", {
+        attemptId: AgentCli.Argument.string("attemptId")
+      }, ({ attemptId }) =>
+        repository.getAttempt(attemptId).pipe(
+          Effect.map(renderAttempt),
+          Effect.catch((error) => Effect.succeed(renderArtifactError(error)))
+        )
+      )
+    )
+  );
+
   const grade = AgentCli.Command.withExamples([
     { command: "artifacts grade attempt123", description: "Grade a quiz/test attempt and persist the graded attempt" }
   ])(
@@ -227,7 +242,7 @@ export const makeArtifactCommands = (repository: ArtifactRepository) => {
     )
   );
 
-  return AgentCli.Command.group("artifacts", [list, show, create, submit, attempts, grade] as const).pipe(
+  return AgentCli.Command.group("artifacts", [list, show, create, submit, attempts, attempt, grade] as const).pipe(
     AgentCli.Command.withDescription("Study artifacts: notes, quizzes, tests, and attempts")
   );
 };
