@@ -1,4 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import proxusLogo from "../assets/proxus-logo.png";
 import type {
   Artifact,
   ArtifactAttempt,
@@ -30,12 +31,13 @@ export function ArtifactWorkspace({ artifactId }: ArtifactWorkspaceProps) {
 
 function EmptyWorkspace() {
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
-      <div className="grid h-full place-items-center rounded-3xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center">
-        <div>
-          <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">Practice workspace</p>
-          <h2 className="text-balance font-bold text-3xl text-slate-100">Select a note, quiz, or test from the sidebar.</h2>
-          <p className="mt-3 max-w-xl text-slate-400">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
+    <main className="h-screen min-w-0 overflow-y-auto border-slate-200 border-r bg-white p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+      <div className="grid h-full place-items-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+        <div className="flex flex-col items-center">
+          <img src={proxusLogo} alt="Proxus" className="mb-8 w-48 select-none pointer-events-none" />
+          <p className="mb-2 font-bold text-violet-500 text-xs uppercase tracking-widest">Practice workspace</p>
+          <h2 className="text-balance font-bold text-3xl text-slate-900">Select a note, quiz, or test from the sidebar.</h2>
+          <p className="mt-3 max-w-xl text-slate-500">Quizzes and tests can be solved directly here. The tutor chat remains available for hints and explanations.</p>
         </div>
       </div>
     </main>
@@ -46,11 +48,11 @@ function ArtifactDetail({ artifactId }: { readonly artifactId: string }) {
   const artifact = useAtomValue(artifactQuery(artifactId));
 
   return (
-    <main className="h-screen min-w-0 overflow-y-auto border-slate-800 border-r bg-slate-950 p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
+    <main className="h-screen min-w-0 overflow-y-auto border-slate-200 border-r bg-white p-6 max-md:h-auto max-md:border-r-0 max-md:border-b">
       {AsyncResult.matchWithError(artifact, {
-        onInitial: () => <p className="text-slate-400">Loading artifact…</p>,
-        onError: (error) => <p className="text-red-200">{String(error)}</p>,
-        onDefect: (defect) => <p className="text-red-200">{String(defect)}</p>,
+        onInitial: () => <p className="text-slate-500">Loading artifact…</p>,
+        onError: (error) => <p className="text-red-500">{String(error)}</p>,
+        onDefect: (defect) => <p className="text-red-500">{String(defect)}</p>,
         onSuccess: ({ value }) => <ArtifactContent artifact={value} />
       })}
     </main>
@@ -69,10 +71,10 @@ function ArtifactContent({ artifact }: { readonly artifact: Artifact }) {
 
 function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { readonly kind: "note" }> }) {
   return (
-    <article className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-slate-950/30">
-      <p className="mb-2 font-bold text-sky-400 text-xs uppercase tracking-widest">Note</p>
-      <h2 className="mb-6 font-bold text-3xl text-slate-100">{artifact.title}</h2>
-      <div className="prose prose-invert max-w-none">
+    <article className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <p className="mb-2 font-bold text-violet-500 text-xs uppercase tracking-widest">Note</p>
+      <h2 className="mb-6 font-bold text-3xl text-slate-900">{artifact.title}</h2>
+      <div className="prose max-w-none">
         <Streamdown>{artifact.markdown}</Streamdown>
       </div>
     </article>
@@ -81,9 +83,9 @@ function NoteViewer({ artifact }: { readonly artifact: Extract<Artifact, { reado
 
 function ExerciseStatus({ status }: { readonly status: "not-started" | "in-progress" | "completed" }) {
   const styles = {
-    "not-started": "border-slate-700 text-slate-400",
-    "in-progress": "border-amber-700 text-amber-300",
-    completed: "border-emerald-700 text-emerald-300"
+    "not-started": "border-slate-300 text-slate-500",
+    "in-progress": "border-amber-400 text-amber-600",
+    completed: "border-emerald-400 text-emerald-600"
   } as const;
   const labels = {
     "not-started": "Not started",
@@ -145,11 +147,11 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
     <article className="mx-auto max-w-4xl">
       <header className="mb-6">
         <div className="mb-2 flex items-center justify-between gap-4">
-          <p className="font-bold text-sky-400 text-xs uppercase tracking-widest">{artifact.kind}</p>
+          <p className="font-bold text-violet-500 text-xs uppercase tracking-widest">{artifact.kind}</p>
           <ExerciseStatus status={status} />
         </div>
-        <h2 className="font-bold text-4xl text-slate-100">{artifact.title}</h2>
-        <p className="mt-2 text-slate-400">Answer every question, submit, and review your corrections.</p>
+        <h2 className="font-bold text-4xl text-slate-900">{artifact.title}</h2>
+        <p className="mt-2 text-slate-500">Answer every question, submit, and review your corrections.</p>
       </header>
 
       <div className="grid gap-4">
@@ -166,21 +168,21 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
         ))}
       </div>
 
-      {error !== undefined && <p className="mt-4 rounded-2xl border border-red-900 bg-red-950/50 p-4 text-red-100">{error}</p>}
+      {error !== undefined && <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</p>}
 
       {attempt?.status === "graded" && <AttemptSummary attempt={attempt} />}
 
-      <footer className="sticky bottom-0 mt-6 rounded-3xl border border-slate-800 bg-slate-950/95 p-4 backdrop-blur">
+      <footer className="sticky bottom-0 mt-6 rounded-3xl border border-slate-200 bg-white/95 p-4 backdrop-blur">
         {attempt === null
           ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-slate-400 text-sm">
+                <p className="text-slate-500 text-sm">
                   {unansweredQuestions.length === 0
                     ? "Ready to submit."
                     : `${unansweredQuestions.length} question${unansweredQuestions.length === 1 ? "" : "s"} unanswered.`}
                 </p>
                 <button
-                  className="rounded-full bg-sky-600 px-6 py-2.5 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                  className="rounded-full bg-violet-600 px-6 py-2.5 font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
                   type="button"
                   disabled={unansweredQuestions.length > 0 || isSubmitting}
                   onClick={submit}
@@ -191,9 +193,9 @@ function ExerciseSolver({ artifact }: { readonly artifact: Extract<Artifact, { r
             )
           : (
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold text-emerald-200">Attempt graded.</p>
+                <p className="font-semibold text-emerald-600">Attempt graded.</p>
                 <button
-                  className="rounded-full border border-slate-700 px-5 py-2 text-slate-200 hover:border-sky-400"
+                  className="rounded-full border border-slate-300 px-5 py-2 text-slate-700 hover:border-violet-400"
                   type="button"
                   onClick={() => {
                     setAnswers({});
@@ -226,11 +228,11 @@ function QuestionCard({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-700/80 bg-slate-900 p-5 shadow-lg shadow-black/30">
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-2 text-slate-400 text-sm">Question {index + 1} · {question.type}</p>
-          <h3 className="font-semibold text-lg text-slate-100">{question.prompt}</h3>
+          <p className="mb-2 text-slate-500 text-sm">Question {index + 1} · {question.type}</p>
+          <h3 className="font-semibold text-lg text-slate-900">{question.prompt}</h3>
         </div>
         {correction !== undefined && <CorrectionBadge correction={correction} />}
       </div>
@@ -243,7 +245,7 @@ function QuestionCard({
       )}
       {question.type === "short-answer" && (
         <textarea
-          className="min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 outline-none focus:border-sky-400 disabled:opacity-70"
+          className="min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-900 outline-none focus:border-violet-400 disabled:opacity-70"
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.currentTarget.value)}
@@ -270,7 +272,7 @@ function MultipleChoiceInput({
   return (
     <div className="grid gap-2">
       {question.options.map((option) => (
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 hover:border-sky-500" key={option.id}>
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 hover:border-violet-500" key={option.id}>
           <input
             type="radio"
             name={question.id}
@@ -301,7 +303,7 @@ function TrueFalseInput({
         ["true", "True"],
         ["false", "False"]
       ] as const).map(([nextValue, label]) => (
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 hover:border-sky-500" key={nextValue}>
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 hover:border-violet-500" key={nextValue}>
           <input
             type="radio"
             name={`true-false-${label}`}
@@ -319,9 +321,9 @@ function TrueFalseInput({
 
 function AttemptSummary({ attempt }: { readonly attempt: Extract<ArtifactAttempt, { readonly status: "graded" }> }) {
   return (
-    <section className="mt-6 rounded-3xl border border-emerald-900 bg-emerald-950/30 p-5">
-      <p className="font-bold text-emerald-200 text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
-      <p className="mt-1 text-emerald-100/80">{attempt.summary}</p>
+    <section className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+      <p className="font-bold text-emerald-700 text-xl">Score: {attempt.score} / {attempt.maxScore}</p>
+      <p className="mt-1 text-emerald-700/80">{attempt.summary}</p>
     </section>
   );
 }
@@ -330,16 +332,16 @@ function CorrectionBadge({ correction }: { readonly correction: QuestionCorrecti
   if (correction.questionType === "short-answer") {
     const ratio = correction.maxScore === 0 ? 1 : correction.score / correction.maxScore;
     const badgeClass = ratio >= 1
-      ? "bg-emerald-950 text-emerald-200"
+      ? "bg-emerald-100 text-emerald-700"
       : ratio > 0
-        ? "bg-amber-950 text-amber-200"
-        : "bg-red-950 text-red-200";
+        ? "bg-amber-100 text-amber-700"
+        : "bg-red-100 text-red-700";
     return <span className={`rounded-full px-3 py-1 font-semibold text-sm ${badgeClass}`}>{correction.score}/{correction.maxScore}</span>;
   }
 
   return correction.correct
-    ? <span className="rounded-full bg-emerald-950 px-3 py-1 font-semibold text-emerald-200 text-sm">Correct</span>
-    : <span className="rounded-full bg-red-950 px-3 py-1 font-semibold text-red-200 text-sm">Review</span>;
+    ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-700 text-sm">Correct</span>
+    : <span className="rounded-full bg-red-100 px-3 py-1 font-semibold text-red-700 text-sm">Review</span>;
 }
 
 function CorrectionDetails({
@@ -350,21 +352,21 @@ function CorrectionDetails({
   readonly question: QuizQuestion | TestQuestion;
 }) {
   return (
-    <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm">
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
       {correction.questionType === "multiple-choice" && question.type === "multiple-choice" && (
         <>
-          <p className="text-slate-300">Correct answer: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
-          <p className="mt-2 text-slate-400">{correction.explanation}</p>
+          <p className="text-slate-700">Correct answer: <strong>{optionText(question, correction.correctOptionId)}</strong></p>
+          <p className="mt-2 text-slate-500">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "true-false" && (
         <>
-          <p className="text-slate-300">Correct answer: <strong>{correction.correctAnswer ? "True" : "False"}</strong></p>
-          <p className="mt-2 text-slate-400">{correction.explanation}</p>
+          <p className="text-slate-700">Correct answer: <strong>{correction.correctAnswer ? "True" : "False"}</strong></p>
+          <p className="mt-2 text-slate-500">{correction.explanation}</p>
         </>
       )}
       {correction.questionType === "short-answer" && (
-        <p className="text-slate-300">{correction.feedback}</p>
+        <p className="text-slate-700">{correction.feedback}</p>
       )}
     </div>
   );

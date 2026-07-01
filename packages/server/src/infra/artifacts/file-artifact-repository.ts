@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
 import {
   Artifact,
   ArtifactAttempt,
@@ -111,13 +111,19 @@ export const FileArtifactRepository = {
 
     const listArtifacts = (input: ListArtifactsInput = {}) => Effect.gen(function* () {
       const files = yield* listFiles(artifactsDirectory);
-      const artifacts = yield* Effect.all(
-        files.filter((file) => file.endsWith(".json")).map((file) => {
+      const artifactsWithTime = yield* Effect.all(
+        files.filter((file) => file.endsWith(".json")).map((file) => Effect.gen(function* () {
           const artifactId = decodeURIComponent(file.replace(/\.json$/, ""));
-          return readArtifactFile(artifactId);
-        })
+          const artifact = yield* readArtifactFile(artifactId);
+          const stat = yield* fs.stat(artifactPath(artifactId)).pipe(Effect.mapError(mapStorageError));
+          const mtime = Option.getOrElse(stat.mtime, () => new Date(0));
+          return { artifact, mtime };
+        }))
       );
-      return artifacts.filter((artifact) => input.kind === undefined || artifact.kind === input.kind);
+      return artifactsWithTime
+        .filter(({ artifact }) => input.kind === undefined || artifact.kind === input.kind)
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
+        .map(({ artifact }) => artifact);
     });
 
     const submitAttempt = (input: SubmitAttemptInput) => Effect.gen(function* () {

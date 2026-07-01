@@ -8,6 +8,7 @@ import { materialsQuery } from "../domain/materials/atoms.ts";
 import { applyInvalidations, invalidationsForToolCall } from "../domain/tutor/invalidation.ts";
 import { streamTutorMessage } from "../domain/tutor/stream.ts";
 import { tutorMessagesAtom } from "../domain/tutor/atoms.ts";
+import proxusLogo from "../assets/proxus-logo.png";
 import { SparkleIcon } from "./icons.tsx";
 
 const starterPrompts = [
@@ -122,14 +123,14 @@ export function Chat() {
   };
 
   return (
-    <main className="grid h-screen max-h-screen min-w-0 grid-rows-[auto_1fr_auto_auto] bg-slate-950 max-md:h-auto max-md:max-h-none">
-      <header className="flex items-center justify-between gap-4 border-slate-800 border-b px-6 py-5">
+    <main className="grid h-screen max-h-screen min-w-0 grid-rows-[auto_1fr_auto_auto] bg-white max-md:h-auto max-md:max-h-none">
+      <header className="flex items-center justify-between gap-4 border-slate-200 border-b px-6 py-5">
         <div>
-          <p className="mb-1 font-bold text-sky-400 text-xs uppercase tracking-widest">Ephemeral session</p>
-          <h1 className="m-0 font-bold text-2xl text-slate-100">Academic tutor</h1>
+          <p className="mb-1 font-bold text-violet-500 text-xs uppercase tracking-widest">Ephemeral session</p>
+          <h1 className="m-0 font-bold text-2xl text-slate-900">Academic tutor</h1>
         </div>
         <button
-          className="rounded-full border border-slate-700 px-4 py-2 text-slate-300 text-sm hover:border-slate-500 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full border border-slate-300 px-4 py-2 text-slate-600 text-sm hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
           type="button"
           onClick={() => setMessages([])}
           disabled={messages.length === 0}
@@ -142,14 +143,14 @@ export function Chat() {
         {messages.length === 0
           ? (
               <div className="m-auto w-full max-w-3xl text-center">
-                <h2 className="m-0 text-balance font-bold text-2xl text-slate-100 leading-snug">
+                <h2 className="m-0 text-balance font-bold text-2xl text-slate-900 leading-snug">
                   Ask about your materials, notes, quizzes, or tests.
                 </h2>
-                <p className="mt-3 text-slate-400 text-sm">The chat history lives only in browser memory. Refreshing starts over.</p>
+                <p className="mt-3 text-slate-500 text-sm">The chat history lives only in browser memory. Refreshing starts over.</p>
                 <div className="mt-6 grid gap-3">
                   {starterPrompts.map((prompt) => (
                     <button
-                      className="rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-sky-500"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-800 transition hover:border-violet-500"
                       key={prompt}
                       type="button"
                       onClick={() => void submit(prompt)}
@@ -170,17 +171,17 @@ export function Chat() {
         <div ref={bottomRef} />
       </section>
 
-      {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-300 text-sm">{error}</p>}
+      {error === undefined ? null : <p className="m-0 px-6 pb-3 text-red-500 text-sm">{error}</p>}
 
       <form
-        className="grid grid-cols-[1fr_auto] gap-3 border-slate-800 border-t bg-slate-950/95 px-6 pt-4 pb-6"
+        className="grid grid-cols-[1fr_auto] gap-3 border-slate-200 border-t bg-white/95 px-6 pt-4 pb-6"
         onSubmit={(event) => {
           event.preventDefault();
           void submit(input);
         }}
       >
         <textarea
-          className="w-full resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 leading-6 outline-none focus:border-transparent focus:ring-2 focus:ring-sky-400"
+          className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 leading-6 outline-none focus:border-transparent focus:ring-2 focus:ring-violet-400"
           value={input}
           onChange={(event) => setInput(event.currentTarget.value)}
           onKeyDown={(event) => {
@@ -193,7 +194,7 @@ export function Chat() {
           rows={1}
         />
         <button
-          className="self-end rounded-full bg-sky-600 px-6 py-3 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="self-end rounded-full bg-violet-600 px-6 py-3 font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
           type="submit"
           disabled={isSending || input.trim().length === 0}
         >
@@ -207,15 +208,15 @@ export function Chat() {
 function Avatar({ role }: { readonly role: "user" | "assistant" }) {
   if (role === "user") {
     return (
-      <div className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-700 font-bold text-slate-200 text-xs">
+      <div className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-200 font-bold text-slate-700 text-xs">
         You
       </div>
     );
   }
 
   return (
-    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 font-bold text-white text-xs">
-      T
+    <div className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 overflow-hidden p-1">
+      <img src={proxusLogo} alt="Proxus" className="w-full h-full object-contain select-none pointer-events-none" />
     </div>
   );
 }
@@ -224,10 +225,10 @@ function TypingIndicator() {
   return (
     <div className="flex items-start gap-3">
       <Avatar role="assistant" />
-      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3.5">
+      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
         {[0, 1, 2].map((dot) => (
           <span
-            className="size-1.5 animate-bounce rounded-full bg-slate-500"
+            className="size-1.5 animate-bounce rounded-full bg-slate-400"
             key={dot}
             style={{ animationDelay: `${dot * 120}ms` }}
           />
@@ -241,18 +242,18 @@ function ThoughtBlock({ thought }: { readonly thought: ThoughtGroup }) {
   const label = thought.seconds !== undefined ? `Thought for ${thought.seconds}s` : "Thought";
 
   return (
-    <details className="ml-11 max-w-[85%] rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-1.5 text-slate-500 text-xs">
+    <details className="ml-11 max-w-[85%] rounded-xl border border-slate-200/60 bg-slate-50 px-3 py-1.5 text-slate-500 text-xs">
       <summary className="flex cursor-pointer select-none items-center gap-1.5">
         <SparkleIcon className="size-3" />
         {label}
       </summary>
-      <div className="mt-2 grid gap-2 border-slate-800/60 border-t pt-2">
+      <div className="mt-2 grid gap-2 border-slate-200/60 border-t pt-2">
         {thought.toolMessages.map((message, index) => (
           <div key={index}>
-            <p className="font-semibold text-slate-400">
+            <p className="font-semibold text-slate-500">
               {message.role === "tool-call" ? `Called ${message.name}` : `Result from ${message.name}${message.isFailure ? " (failed)" : ""}`}
             </p>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-slate-500">
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-slate-400">
               {JSON.stringify(message.role === "tool-call" ? message.input : message.result, null, 2)}
             </pre>
           </div>
@@ -275,8 +276,8 @@ function MessageBubble({ message }: { readonly message: AgentMessage }) {
       <article
         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
           isUser
-            ? "bg-sky-600 text-white"
-            : "border border-slate-800 bg-slate-900 text-slate-100"
+            ? "bg-violet-600 text-white"
+            : "border border-slate-200 bg-slate-50 text-slate-900"
         }`}
       >
         <div className="text-[15px] leading-7">

@@ -32,14 +32,14 @@ export function App() {
 
   return (
     <div
-      className="grid h-screen min-h-screen overflow-hidden bg-slate-950 text-slate-100"
+      className="grid h-screen min-h-screen overflow-hidden bg-white text-slate-900"
       style={{ gridTemplateColumns: `320px minmax(0, 1fr) 6px ${chatWidth}px` }}
     >
       <Sidebar selectedArtifactId={selectedArtifactId} onSelectArtifact={setSelectedArtifactId} />
       <ArtifactWorkspace artifactId={selectedArtifactId} />
       <button
         aria-label="Resize chat panel"
-        className="h-full w-full cursor-col-resize border-slate-800 border-x bg-slate-950 hover:bg-sky-900"
+        className="h-full w-full cursor-col-resize border-slate-200 border-x bg-white hover:bg-sky-50"
         type="button"
         onMouseDown={() => setIsResizing(true)}
       />

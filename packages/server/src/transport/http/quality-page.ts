@@ -6,7 +6,7 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
   <title>Proxus — Agent Quality</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;display:flex;flex-direction:column}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f1f5f9;color:#0f172a;height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
     /* ── Top bar ── */
     .topbar{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.5rem;border-bottom:1px solid #e2e8f0;background:#fff;gap:1rem;flex-shrink:0}
@@ -17,48 +17,41 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
     .topbar-actions{display:flex;align-items:center;gap:.75rem}
     .btn{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #cbd5e1;border-radius:99px;padding:.3rem .8rem;font-size:.75rem;color:#64748b;background:#fff;cursor:pointer}
     .btn:hover{border-color:#38bdf8;color:#0284c7}
-    .btn-primary{background:#0284c7;border-color:#0284c7;color:#fff}
-    .btn-primary:hover{background:#0369a1;border-color:#0369a1}
-    .btn-primary:disabled{background:#94a3b8;border-color:#94a3b8;cursor:not-allowed}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-    .kpi-card.updated{animation:fadeIn .4s ease both}
     .meta-text{font-size:.7rem;color:#94a3b8}
 
-    /* ── Layout ── */
+    /* ── Layout: two independent panels filling the remaining viewport height ── */
     .layout{display:grid;grid-template-columns:1fr 650px;flex:1;min-height:0;overflow:hidden}
-    .panel{display:flex;flex-direction:column;overflow:hidden;background:#f8fafc}
+    .panel{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f8fafc}
     .panel-right{background:#fff;border-left:1px solid #e2e8f0}
     .panel-header{padding:.75rem 1.25rem;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#fff}
-    .panel-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#0284c7}
-    .panel-count{font-size:.68rem;color:#94a3b8}
-    .panel-body{flex:1;overflow-y:auto;padding:.75rem}
+    .panel-title{font-size:1.25rem;font-weight:800;letter-spacing:.02em;color:#0284c7}
+    .panel-count{font-size:.75rem;color:#94a3b8}
+
+    /* Left panel: scrollable trace list */
+    .panel-body{flex:1;overflow-y:auto;padding:.75rem;min-height:0}
 
     /* ── KPI cards ── */
-    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;padding:1rem;flex:1}
-    .kpi-card{border-radius:16px;padding:1.5rem 1rem;text-align:center;border:1px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-    .kpi-value{font-size:2.6rem;font-weight:800;line-height:1;letter-spacing:-.02em}
-    .kpi-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.09em;color:#64748b}
+    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;padding:.75rem;flex:1;min-height:0;align-content:stretch}
+    .kpi-card{border-radius:14px;text-align:center;border:1px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .kpi-value{font-size:3rem;font-weight:800;line-height:1;letter-spacing:-.03em}
+    .kpi-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:600}
     .kpi-sub{font-size:.62rem;color:#94a3b8}
-
     .kpi-green{border-color:#bbf7d0}.kpi-green .kpi-value{color:#16a34a}
     .kpi-amber{border-color:#fde68a}.kpi-amber .kpi-value{color:#d97706}
     .kpi-red{border-color:#fecaca}.kpi-red .kpi-value{color:#dc2626}
+    .kpi-purple{border-color:#ddd6fe}.kpi-purple .kpi-value{color:#7c3aed}
     .kpi-empty{border-color:#e2e8f0}.kpi-empty .kpi-value{color:#cbd5e1;font-size:1.4rem}
 
-    /* ── Eval checks ── */
-    .evals-section{border-top:1px solid #f1f5f9;padding:.75rem 1rem}
-    .section-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#94a3b8;margin-bottom:.5rem}
-    .eval-row{display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid #f8fafc;font-size:.73rem}
-    .eval-row:last-child{border-bottom:none}
-    .eval-icon{flex-shrink:0;font-size:.8rem}
-    .eval-id{flex:1;color:#475569;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .badge{padding:.1rem .45rem;border-radius:99px;font-size:.62rem;font-weight:600;flex-shrink:0}
-    .badge-ok{background:#dcfce7;color:#16a34a}
-    .badge-fail{background:#fee2e2;color:#dc2626}
-    .no-data{font-size:.73rem;color:#94a3b8;padding:.375rem 0;line-height:1.6}
-    .no-data code{background:#f1f5f9;padding:.1rem .35rem;border-radius:4px;font-family:monospace;font-size:.68rem}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .kpi-card.updated{animation:fadeIn .4s ease both}
+
+    /* ── Run evaluation button — full-width CTA inside the eval panel ── */
+    .eval-action{padding:.875rem 1.25rem 1.25rem;border-top:1px solid #e2e8f0;flex-shrink:0;background:#fff}
+    .btn-run{width:100%;padding:1.1rem 1.5rem;background:#7c3aed;border:none;border-radius:14px;color:#fff;font-size:1rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:background .15s;letter-spacing:.02em;box-shadow:0 2px 8px rgba(124,58,237,.25)}
+    .btn-run:hover{background:#6d28d9;box-shadow:0 4px 12px rgba(124,58,237,.35)}
+    .btn-run:disabled{background:#94a3b8;box-shadow:none;cursor:not-allowed}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 
     /* ── Traces ── */
     .trace{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:.4rem;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -98,12 +91,12 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
     </div>
     <div class="topbar-actions">
       <button class="btn" onclick="loadAll()">↻ Refresh</button>
-      <button class="btn btn-primary" id="judge-btn" onclick="runJudge()">▶ Run evaluation</button>
     </div>
   </div>
 
   <div class="layout">
-    <div class="panel panel-left">
+    <!-- Left: scrollable trace list -->
+    <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Observability — live traces</span>
         <span class="panel-count" id="trace-count"></span>
@@ -111,13 +104,17 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
       <div class="panel-body" id="traces-body"><div class="loading">Loading…</div></div>
     </div>
 
-    <div class="panel panel-right" style="display:flex;flex-direction:column">
+    <!-- Right: fixed KPI cards + prominent run button at the bottom -->
+    <div class="panel panel-right">
       <div class="panel-header">
         <span class="panel-title">Evaluation scores</span>
         <span class="meta-text" id="eval-time"></span>
       </div>
       <div class="kpi-grid" id="kpi-grid">
-        ${[0,1,2,3,4].map(()=>'<div class="kpi-card kpi-empty"><div class="kpi-value">–</div></div>').join('')}
+        ${[0,1,2,3,4,5].map(()=>'<div class="kpi-card kpi-empty"><div class="kpi-value">–</div></div>').join('')}
+      </div>
+      <div class="eval-action">
+        <button class="btn-run" id="judge-btn" onclick="runJudge()">▶ Run evaluation</button>
       </div>
     </div>
   </div>
@@ -145,16 +142,36 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
       const lats=(traces||[]).filter(t=>t&&t.durationMs>0).map(t=>t.durationMs/1000);
       const avgLat=lats.length?Math.round(lats.reduce((a,b)=>a+b,0)/lats.length*10)/10:null;
       const sub=scored?scored.tracesEvaluated+' traces':null;
+
+      // Token estimation: ~4 chars per token across all trace messages
+      let totalTok=0;
+      (traces||[]).forEach(t=>{
+        (t.messages||[]).forEach(m=>{
+          const txt=m.role==='tool-call'?JSON.stringify(m.input||''):
+                    m.role==='tool-result'?JSON.stringify(m.result||''):
+                    String(m.content||'');
+          totalTok+=Math.round(txt.length/4);
+        });
+      });
+      const fmtTok=totalTok>999999?(totalTok/1e6).toFixed(2)+'M':
+                   totalTok>999?Math.round(totalTok/1000)+'K':
+                   totalTok>0?String(totalTok):null;
+      // Cost estimate: gemini-2.5-flash $0.15/1M input + $0.60/1M output, blended ~$0.30/1M
+      const costUsd=totalTok/1e6*0.30;
+      const fmtCost=totalTok>0?'$'+costUsd.toFixed(4):null;
+
       document.getElementById('kpi-grid').innerHTML=[
         kpiCard(acc!==null?acc+'%':null,'Accuracy',sub,pctColor(acc)),
         kpiCard(help!==null?help+'%':null,'Helpfulness',null,pctColor(help)),
         kpiCard(gnd!==null?gnd+'%':null,'Groundedness',null,pctColor(gnd)),
-        kpiCard(avgLat!==null?avgLat+'s':null,'Avg latency',lats.length?lats.length+' calls':null,latColor(avgLat))
+        kpiCard(avgLat!==null?avgLat+'s':null,'Avg latency',lats.length?lats.length+' calls':null,latColor(avgLat)),
+        kpiCard(fmtTok,'Est. tokens','~4 chars/tok',fmtTok?'kpi-purple':'kpi-empty'),
+        kpiCard(fmtCost,'Est. cost','flash 2.5 pricing',fmtCost?'kpi-purple':'kpi-empty')
       ].join('');
       if(scored) document.getElementById('eval-time').textContent='Last eval: '+fmt(scored.scoredAt);
     }
 
-function renderTraces(traces){
+    function renderTraces(traces){
       if(!traces||traces.length===0){
         document.getElementById('trace-count').textContent='';
         return '<div class="empty">No traces yet.<br>Use the tutor at <b>localhost:5173</b><br>and the conversations appear here automatically.</div>';
@@ -207,7 +224,6 @@ function renderTraces(traces){
           const scored=await res.json();
           const traces=await fetch('/quality/traces').then(r=>r.json()).catch(()=>[]);
           renderKpis(scored,null,traces);
-          /* flash updated cards */
           document.querySelectorAll('.kpi-card').forEach(el=>{
             el.classList.remove('updated');
             void el.offsetWidth;
@@ -215,10 +231,9 @@ function renderTraces(traces){
           });
           btn.innerHTML='✓ Done';
           btn.style.background='#16a34a';
-          btn.style.borderColor='#16a34a';
           setTimeout(()=>{
             btn.innerHTML='▶ Run evaluation';
-            btn.style.background='';btn.style.borderColor='';
+            btn.style.background='';
             btn.disabled=false;
           },2500);
         }

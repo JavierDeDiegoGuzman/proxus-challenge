@@ -34,8 +34,8 @@ export const FileMaterialRepository = {
         Effect.mapError(mapError)
       );
 
-      return yield* Effect.forEach(
-        entries.filter((entry) => path.extname(entry).toLowerCase() === ".pdf").sort(),
+      const files = yield* Effect.forEach(
+        entries.filter((entry) => path.extname(entry).toLowerCase() === ".pdf"),
         (fileName): Effect.Effect<PdfFile, MaterialRepositoryError> => Effect.gen(function* () {
           const fullPath = pdfPath(fileName);
           const stat = yield* fs.stat(fullPath).pipe(
@@ -52,6 +52,7 @@ export const FileMaterialRepository = {
         }),
         { concurrency: 1 }
       );
+      return files.sort((a, b) => b.material.uploadedAt.localeCompare(a.material.uploadedAt));
     });
 
     const getFile = (id: string): Effect.Effect<PdfFile, MaterialNotFound | MaterialRepositoryError> => Effect.gen(function* () {

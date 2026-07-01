@@ -166,8 +166,8 @@ const renderMessage = (message: AgentMessageType): Prompt.MessageEncoded => {
       };
     case "tool-call":
       return {
-        role: "assistant",
-        content: `Tool call ${message.name}: ${JSON.stringify(message.input)}`
+        role: "user",
+        content: `[tool_call: ${message.name} ${JSON.stringify(message.input)}]`
       };
     case "tool-result":
       if (!message.isFailure && isMaterialPageImages(message.result)) {
