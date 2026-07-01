@@ -2,6 +2,7 @@ import { Effect, Layer, Schema, Stream } from "effect";
 import { FileSystem } from "effect";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { createServer } from "node:http";
+import * as nodeFs from "node:fs";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { LanguageModel } from "effect/unstable/ai";
@@ -214,6 +215,23 @@ const InfraLive = Layer.mergeAll(
   ),
   FileArtifactRepository.layer(".data/artifacts")
 );
+
+const clearSessionData = () => {
+  try {
+    if (nodeFs.existsSync(LOGS_DIR)) {
+      for (const f of nodeFs.readdirSync(LOGS_DIR)) {
+        nodeFs.unlinkSync(`${LOGS_DIR}/${f}`);
+      }
+    }
+    if (nodeFs.existsSync(SCORES_PATH)) {
+      nodeFs.unlinkSync(SCORES_PATH);
+    }
+  } catch {
+    // non-critical
+  }
+};
+
+clearSessionData();
 
 export const HttpServerLive = HttpRouter.serve(Routes).pipe(
   Layer.provide(DomainLive),

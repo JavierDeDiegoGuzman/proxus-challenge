@@ -143,13 +143,14 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
       const avgLat=lats.length?Math.round(lats.reduce((a,b)=>a+b,0)/lats.length*10)/10:null;
       const sub=scored?scored.tracesEvaluated+' traces':null;
 
-      // Token estimation: ~4 chars per token across all trace messages
+      // Token estimation: ~4 chars per token, user/assistant/tool-call only.
+      // tool-result is excluded because it contains full PDF page payloads
+      // that inflate the count by 100x without reflecting real prompt tokens.
       let totalTok=0;
       (traces||[]).forEach(t=>{
         (t.messages||[]).forEach(m=>{
-          const txt=m.role==='tool-call'?JSON.stringify(m.input||''):
-                    m.role==='tool-result'?JSON.stringify(m.result||''):
-                    String(m.content||'');
+          if(m.role==='tool-result') return;
+          const txt=m.role==='tool-call'?JSON.stringify(m.input||''):String(m.content||'');
           totalTok+=Math.round(txt.length/4);
         });
       });
@@ -165,7 +166,7 @@ export const qualityDashboardHtml = /* html */`<!DOCTYPE html>
         kpiCard(help!==null?help+'%':null,'Helpfulness',null,pctColor(help)),
         kpiCard(gnd!==null?gnd+'%':null,'Groundedness',null,pctColor(gnd)),
         kpiCard(avgLat!==null?avgLat+'s':null,'Avg latency',lats.length?lats.length+' calls':null,latColor(avgLat)),
-        kpiCard(fmtTok,'Est. tokens','~4 chars/tok',fmtTok?'kpi-purple':'kpi-empty'),
+        kpiCard(fmtTok,'Est. tokens','excl. PDF payloads',fmtTok?'kpi-purple':'kpi-empty'),
         kpiCard(fmtCost,'Est. cost','flash 2.5 pricing',fmtCost?'kpi-purple':'kpi-empty')
       ].join('');
       if(scored) document.getElementById('eval-time').textContent='Last eval: '+fmt(scored.scoredAt);
